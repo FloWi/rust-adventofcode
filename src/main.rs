@@ -14,8 +14,10 @@ fn solve_day(args: &Args) -> Result<String> {
         // Add more cases as you solve more days
         _ => bail!(
             "Solution for year {} day {} part {} not implemented",
-            args.year, args.day, args.part
-        )
+            args.year,
+            args.day,
+            args.part
+        ),
     }
 }
 
