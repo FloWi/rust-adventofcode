@@ -1,10 +1,10 @@
-use crate::parsers::streaming_parse;
+use crate::parsers::streaming_parse_number_pair;
 use anyhow::Result;
 use itertools::Itertools;
 use std::fmt::Debug;
 
 pub(crate) fn part1(input: &str) -> Result<String> {
-    let (left, right): (Vec<i32>, Vec<i32>) = streaming_parse(input).unzip();
+    let (left, right): (Vec<i32>, Vec<i32>) = streaming_parse_number_pair(input).unzip();
 
     let diffs = left
         .iter()
@@ -21,7 +21,7 @@ pub(crate) fn part1(input: &str) -> Result<String> {
 }
 
 pub(crate) fn part2(input: &str) -> Result<String> {
-    let (left, right): (Vec<i32>, Vec<i32>) = streaming_parse(input).unzip();
+    let (left, right): (Vec<i32>, Vec<i32>) = streaming_parse_number_pair(input).unzip();
 
     let right_counts = right.iter().counts();
     let similarity_scores = left

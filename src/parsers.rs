@@ -13,7 +13,7 @@ pub fn number_pair(input: &str) -> IResult<&str, (i32, i32)> {
     separated_pair(number, space0, number)(input)
 }
 
-pub fn streaming_parse<'a>(input: &'a str) -> impl Iterator<Item = (i32, i32)> + 'a {
+pub fn streaming_parse_number_pair<'a>(input: &'a str) -> impl Iterator<Item = (i32, i32)> + 'a {
     let mut it = iterator(input, terminated(number_pair, line_ending));
     std::iter::from_fn(move || (&mut it).next().map(|x| x))
 }
