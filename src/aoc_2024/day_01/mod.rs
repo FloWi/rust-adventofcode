@@ -4,9 +4,8 @@ use std::fmt::Debug;
 use std::str::FromStr;
 
 pub(crate) fn part1(input: &str) -> Result<String> {
-    let numbers: Vec<(i32, i32)> = parse_number_pairs(input, str::split_whitespace);
-
-    let (left, right): (Vec<_>, Vec<_>) = numbers.iter().cloned().unzip();
+    let (left, right): (Vec<_>, Vec<_>) =
+        parse_number_pairs::<i32, _>(input, str::split_whitespace).unzip();
 
     let diffs = left
         .iter()
@@ -23,9 +22,8 @@ pub(crate) fn part1(input: &str) -> Result<String> {
 }
 
 pub(crate) fn part2(input: &str) -> Result<String> {
-    let numbers: Vec<(i32, i32)> = parse_number_pairs(input, str::split_whitespace);
-
-    let (left, right): (Vec<_>, Vec<_>) = numbers.iter().cloned().unzip();
+    let (left, right): (Vec<_>, Vec<_>) =
+        parse_number_pairs::<i32, _>(input, str::split_whitespace).unzip();
 
     let right_counts = right.iter().counts();
     let similarity_scores = left
@@ -48,8 +46,8 @@ pub(crate) fn part2(input: &str) -> Result<String> {
 
 fn parse_number_pairs<'a, Num, I>(
     input: &'a str,
-    splitter: impl Fn(&'a str) -> I,
-) -> Vec<(Num, Num)>
+    splitter: impl Fn(&'a str) -> I + 'a,
+) -> impl Iterator<Item = (Num, Num)> + 'a
 where
     Num: FromStr,
     <Num as FromStr>::Err: Debug,
@@ -57,12 +55,11 @@ where
 {
     input
         .lines()
-        .map(|line| match splitter(line).collect::<Vec<_>>()[..] {
+        .map(move |line| match splitter(line).collect::<Vec<_>>()[..] {
             [a, b] => (
                 a.parse().expect("First must be a number"),
                 b.parse().expect("Second must be a number"),
             ),
             _ => panic!("Input must be exactly two numbers"),
         })
-        .collect()
 }
