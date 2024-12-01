@@ -23,5 +23,25 @@ pub(crate) fn part1(input: &str) -> Result<String> {
 }
 
 pub(crate) fn part2(input: &str) -> Result<String> {
-    todo!()
+    let numbers: Vec<(i32, i32)> = input.lines().map(|line| {
+        let parts = line.split_whitespace().collect_vec();
+        let part_0 = parts[0].parse::<i32>().unwrap();
+        let part_1 = parts[1].parse::<i32>().unwrap();
+        (part_0, part_1)
+    }).collect();
+
+    let (left, right): (Vec<_>, Vec<_>) = numbers.iter().cloned().unzip();
+
+    let right_counts = right.iter().counts();
+    let similarity_scores = left.iter().map(|n| {
+        (n, right_counts.get(n).unwrap_or(&0) * (*n as usize))
+    }).collect_vec();
+    let total_similarity_score: usize = similarity_scores.iter().map(|(_, similarity_score)| *similarity_score).sum();
+
+    // dbg!(&right_counts);
+    // dbg!(&similarity_scores);
+
+    println!("total_similarity_score: {total_similarity_score}");
+
+    Ok(format!("{total_similarity_score}"))
 }
