@@ -2,12 +2,7 @@ use anyhow::Result;
 use itertools::Itertools;
 
 pub(crate) fn part1(input: &str) -> Result<String> {
-    let numbers: Vec<(i32, i32)> = input.lines().map(|line| {
-        let parts = line.split_whitespace().collect_vec();
-        let part_0 = parts[0].parse::<i32>().unwrap();
-        let part_1 = parts[1].parse::<i32>().unwrap();
-        (part_0, part_1)
-    }).collect();
+    let numbers: Vec<(i32, i32)> = parse_number_pairs(input);
 
     let (left, right): (Vec<_>, Vec<_>) = numbers.iter().cloned().unzip();
 
@@ -23,12 +18,7 @@ pub(crate) fn part1(input: &str) -> Result<String> {
 }
 
 pub(crate) fn part2(input: &str) -> Result<String> {
-    let numbers: Vec<(i32, i32)> = input.lines().map(|line| {
-        let parts = line.split_whitespace().collect_vec();
-        let part_0 = parts[0].parse::<i32>().unwrap();
-        let part_1 = parts[1].parse::<i32>().unwrap();
-        (part_0, part_1)
-    }).collect();
+    let numbers: Vec<(i32, i32)> = parse_number_pairs(input);
 
     let (left, right): (Vec<_>, Vec<_>) = numbers.iter().cloned().unzip();
 
@@ -44,4 +34,16 @@ pub(crate) fn part2(input: &str) -> Result<String> {
     println!("total_similarity_score: {total_similarity_score}");
 
     Ok(format!("{total_similarity_score}"))
+}
+
+fn parse_number_pairs(input: &str) -> Vec<(i32, i32)> {
+    input.lines().map(|line| {
+        match line.split_whitespace().collect::<Vec<_>>()[..] {
+            [a, b] => (
+                a.parse().expect("First must be a number"),
+                b.parse().expect("Second must be a number")
+            ),
+            _ => panic!("Input must be exactly two numbers")
+        }
+    }).collect()
 }
