@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use std::str::FromStr;
 
 pub(crate) fn part1(input: &str) -> Result<String> {
-    let numbers: Vec<(i32, i32)> = parse_number_pairs::<i32>(input);
+    let numbers: Vec<(i32, i32)> = parse_number_pairs(input, str::split_whitespace);
 
     let (left, right): (Vec<_>, Vec<_>) = numbers.iter().cloned().unzip();
 
@@ -23,7 +23,7 @@ pub(crate) fn part1(input: &str) -> Result<String> {
 }
 
 pub(crate) fn part2(input: &str) -> Result<String> {
-    let numbers: Vec<(i32, i32)> = parse_number_pairs::<i32>(input);
+    let numbers: Vec<(i32, i32)> = parse_number_pairs(input, str::split_whitespace);
 
     let (left, right): (Vec<_>, Vec<_>) = numbers.iter().cloned().unzip();
 
@@ -46,21 +46,23 @@ pub(crate) fn part2(input: &str) -> Result<String> {
     Ok(format!("{total_similarity_score}"))
 }
 
-fn parse_number_pairs<Num>(input: &str) -> Vec<(Num, Num)>
+fn parse_number_pairs<'a, Num, I>(
+    input: &'a str,
+    splitter: impl Fn(&'a str) -> I,
+) -> Vec<(Num, Num)>
 where
     Num: FromStr,
     <Num as FromStr>::Err: Debug,
+    I: Iterator<Item = &'a str>,
 {
     input
         .lines()
-        .map(
-            |line| match line.split_whitespace().collect::<Vec<_>>()[..] {
-                [a, b] => (
-                    a.parse().expect("First must be a number"),
-                    b.parse().expect("Second must be a number"),
-                ),
-                _ => panic!("Input must be exactly two numbers"),
-            },
-        )
+        .map(|line| match splitter(line).collect::<Vec<_>>()[..] {
+            [a, b] => (
+                a.parse().expect("First must be a number"),
+                b.parse().expect("Second must be a number"),
+            ),
+            _ => panic!("Input must be exactly two numbers"),
+        })
         .collect()
 }
