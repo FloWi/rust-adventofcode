@@ -4,8 +4,6 @@ use itertools::Itertools;
 use std::fmt::Debug;
 
 pub(crate) fn part1(input: &str) -> Result<String> {
-    let input_parsed = streaming_parse(input).collect_vec();
-
     let (left, right): (Vec<i32>, Vec<i32>) = streaming_parse(input).unzip();
 
     let diffs = left
