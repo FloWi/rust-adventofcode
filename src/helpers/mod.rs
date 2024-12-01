@@ -1,13 +1,5 @@
 use anyhow::Result;
 use clap::Parser;
-use nom::character::complete::space0;
-use nom::combinator::iterator;
-use nom::{
-    character::complete::{digit1, line_ending},
-    combinator::map_res,
-    sequence::{separated_pair, terminated},
-    IResult,
-};
 use std::fmt::Debug;
 use std::fs;
 use std::path::PathBuf;
@@ -53,19 +45,4 @@ pub fn read_input(args: &Args) -> Result<String> {
 
     let input = fs::read_to_string(input_path)?;
     Ok(input)
-}
-
-// Single number parser
-pub fn number(input: &str) -> IResult<&str, i32> {
-    map_res(digit1, str::parse)(input)
-}
-
-// Parse a pair of numbers on one line
-pub fn number_pair(input: &str) -> IResult<&str, (i32, i32)> {
-    separated_pair(number, space0, number)(input)
-}
-
-pub fn streaming_parse<'a>(input: &'a str) -> impl Iterator<Item = (i32, i32)> + 'a {
-    let mut it = iterator(input, terminated(number_pair, line_ending));
-    std::iter::from_fn(move || (&mut it).next().map(|x| x))
 }

@@ -4,6 +4,7 @@ use clap::Parser;
 
 mod aoc_2024;
 mod helpers;
+mod parsers;
 
 fn solve_day(args: &Args) -> Result<String> {
     let input = helpers::read_input(args)?;

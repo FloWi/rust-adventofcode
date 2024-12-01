@@ -1,4 +1,4 @@
-use crate::helpers::streaming_parse;
+use crate::parsers::streaming_parse;
 use anyhow::Result;
 use itertools::Itertools;
 use std::fmt::Debug;
