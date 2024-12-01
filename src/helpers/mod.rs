@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use std::fmt::Debug;
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -44,4 +45,24 @@ pub fn read_input(args: &Args) -> Result<String> {
 
     let input = fs::read_to_string(input_path)?;
     Ok(input)
+}
+
+pub fn parse_number_pairs<'a, Num, I>(
+    input: &'a str,
+    splitter: impl Fn(&'a str) -> I + 'a,
+) -> impl Iterator<Item = (Num, Num)> + 'a
+where
+    Num: FromStr,
+    <Num as FromStr>::Err: Debug,
+    I: Iterator<Item = &'a str>,
+{
+    input
+        .lines()
+        .map(move |line| match splitter(line).collect::<Vec<_>>()[..] {
+            [a, b] => (
+                a.parse().expect("First must be a number"),
+                b.parse().expect("Second must be a number"),
+            ),
+            _ => panic!("Input must be exactly two numbers"),
+        })
 }
