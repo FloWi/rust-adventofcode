@@ -1,8 +1,10 @@
 use anyhow::Result;
 use itertools::Itertools;
+use std::fmt::Debug;
+use std::str::FromStr;
 
 pub(crate) fn part1(input: &str) -> Result<String> {
-    let numbers: Vec<(i32, i32)> = parse_number_pairs(input);
+    let numbers: Vec<(i32, i32)> = parse_number_pairs::<i32>(input);
 
     let (left, right): (Vec<_>, Vec<_>) = numbers.iter().cloned().unzip();
 
@@ -21,7 +23,7 @@ pub(crate) fn part1(input: &str) -> Result<String> {
 }
 
 pub(crate) fn part2(input: &str) -> Result<String> {
-    let numbers: Vec<(i32, i32)> = parse_number_pairs(input);
+    let numbers: Vec<(i32, i32)> = parse_number_pairs::<i32>(input);
 
     let (left, right): (Vec<_>, Vec<_>) = numbers.iter().cloned().unzip();
 
@@ -44,7 +46,11 @@ pub(crate) fn part2(input: &str) -> Result<String> {
     Ok(format!("{total_similarity_score}"))
 }
 
-fn parse_number_pairs(input: &str) -> Vec<(i32, i32)> {
+fn parse_number_pairs<Num>(input: &str) -> Vec<(Num, Num)>
+where
+    Num: FromStr,
+    <Num as FromStr>::Err: Debug,
+{
     input
         .lines()
         .map(
