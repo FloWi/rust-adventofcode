@@ -15,7 +15,7 @@ pub fn parse_number_pair(input: &str) -> IResult<&str, (i32, i32)> {
 }
 
 pub fn parse_numbers(input: &str) -> IResult<&str, Vec<i32>> {
-    let (input, _) = space0(input)?; // Handle optional leading whitespace
+    let (input, _) = space0(input)?;
     separated_list0(space1, parse_number)(input)
 }
 

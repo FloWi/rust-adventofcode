@@ -43,6 +43,7 @@ pub fn read_input(args: &Args) -> Result<String> {
         input_path.display()
     );
 
-    let input = fs::read_to_string(input_path)?;
-    Ok(input)
+    let binding = fs::read_to_string(input_path)?;
+    let input = binding.trim();
+    Ok(input.to_string())
 }

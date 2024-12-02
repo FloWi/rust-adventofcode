@@ -10,10 +10,10 @@ fn solve_day(args: &Args) -> Result<String> {
     let input = helpers::read_input(args)?;
 
     match (args.year, args.day, args.part) {
-        (2024, 1, 1) => aoc_2024::day_01::part1(input.as_str()),
-        (2024, 1, 2) => aoc_2024::day_01::part2(input.as_str()),
-        (2024, 2, 1) => aoc_2024::day_02::part1(input.as_str()),
-        (2024, 2, 2) => aoc_2024::day_02::part2(input.as_str()),
+        (2024, 1, 1) => aoc_2024::day_01::part1(input),
+        (2024, 1, 2) => aoc_2024::day_01::part2(input),
+        (2024, 2, 1) => aoc_2024::day_02::part1(input),
+        (2024, 2, 2) => aoc_2024::day_02::part2(input),
         // Add more cases as you solve more days
         _ => bail!(
             "Solution for year {} day {} part {} not implemented",
@@ -32,8 +32,13 @@ fn main() {
         args.year, args.day, args.part
     );
 
-    if let Err(e) = solve_day(&args) {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
+    match solve_day(&args) {
+        Ok(result) => {
+            println!("Result: {}", result);
+        }
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
     }
 }
