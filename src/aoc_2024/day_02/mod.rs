@@ -1,9 +1,10 @@
 use crate::aoc_2024::day_02::LevelCheckResult::{SafeDecreasing, SafeIncreasing, Unsafe};
-use crate::parsers::parse_numbers;
 use anyhow::Result;
 use itertools::*;
-use nom::character::complete::line_ending;
+use nom::character::complete;
+use nom::character::complete::{newline, space1};
 use nom::multi::separated_list1;
+use nom::IResult;
 use std::fmt::Debug;
 
 #[derive(Eq, PartialOrd, PartialEq, Hash)]
@@ -16,7 +17,7 @@ enum LevelCheckResult {
 fn validate_report(report: &Vec<i32>) -> bool {
     let analysis = report
         .into_iter()
-        .tuple_windows::<(_, _)>()
+        .tuple_windows()
         .map(|(n1, n2)| {
             let diff = (n1 - n2).abs();
             if !(1..=3).contains(&diff) {
@@ -55,8 +56,8 @@ fn validate_report_with_problem_dampener(report: &Vec<i32>) -> bool {
             let mut new_report = report.clone();
             let _removed = new_report.remove(problem_idx);
             let new_result = validate_report(&new_report);
-            dbg!(&new_report);
-            dbg!(&new_result);
+            // dbg!(&new_report);
+            // dbg!(&new_result);
 
             if new_result {
                 //println!("found valid report by removing level {removed} at idx {problem_idx}");
@@ -73,13 +74,15 @@ fn validate_report_with_problem_dampener(report: &Vec<i32>) -> bool {
 /// Report is a Vector of Levels
 type Report = Vec<i32>;
 
-fn parse_day02_input(input: &str) -> Result<Vec<Vec<i32>>> {
+fn parse_day02_input(input: &str) -> Result<Vec<Report>> {
     // error needs to be mapped, because it contains &str in it that outlive the lifetime of the input &str
-
-    let (_, reports) = separated_list1(line_ending, parse_numbers)(input)
-        .map_err(|e| anyhow::anyhow!("Parse error: {}", e))?;
+    let (_, reports) = nom_parser(input).map_err(|e| anyhow::anyhow!("Parse error: {}", e))?;
 
     Ok(reports)
+}
+
+fn nom_parser(input: &str) -> IResult<&str, Vec<Report>> {
+    separated_list1(newline, separated_list1(space1, complete::i32))(input)
 }
 
 pub(crate) fn part1(input: String) -> Result<String> {
