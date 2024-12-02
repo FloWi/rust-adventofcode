@@ -12,6 +12,8 @@ fn solve_day(args: &Args) -> Result<String> {
     match (args.year, args.day, args.part) {
         (2024, 1, 1) => aoc_2024::day_01::part1(input.as_str()),
         (2024, 1, 2) => aoc_2024::day_01::part2(input.as_str()),
+        (2024, 2, 1) => aoc_2024::day_02::part1(input.as_str()),
+        (2024, 2, 2) => aoc_2024::day_02::part2(input.as_str()),
         // Add more cases as you solve more days
         _ => bail!(
             "Solution for year {} day {} part {} not implemented",
