@@ -1,0 +1,38 @@
+
+running 2 tests
+ii
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+day_01_bench  fastest       │ slowest       │ median        │ mean          │ samples │ iters
+├─ part1      45.7 µs       │ 116.8 µs      │ 47.49 µs      │ 47.99 µs      │ 100     │ 100
+╰─ part2      57.91 µs      │ 78.66 µs      │ 61.22 µs      │ 61.81 µs      │ 100     │ 100
+
+
+running 2 tests
+ii
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+day_02_bench  fastest       │ slowest       │ median        │ mean          │ samples │ iters
+├─ part1      232.2 µs      │ 315.1 µs      │ 237 µs        │ 239.1 µs      │ 100     │ 100
+╰─ part2      647 µs        │ 688.8 µs      │ 652.9 µs      │ 658.9 µs      │ 100     │ 100
+
