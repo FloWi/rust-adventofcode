@@ -13,8 +13,8 @@ enum LevelCheckResult {
     Unsafe,
 }
 
-fn validate_level(level: &Vec<i32>) -> bool {
-    let analysis = level
+fn validate_report(report: &Vec<i32>) -> bool {
+    let analysis = report
         .into_iter()
         .tuple_windows::<(_, _)>()
         .map(|(n1, n2)| {
@@ -44,16 +44,53 @@ fn validate_level(level: &Vec<i32>) -> bool {
     is_valid
 }
 
+fn validate_report_with_problem_dampener(report: &Vec<i32>) -> bool {
+    let result = validate_report(&report);
+
+    if result == true {
+        //println("initial report is valid - no need to remove a level");
+        return true;
+    } else {
+        for (problem_idx, _) in report.iter().enumerate() {
+            let mut new_report = report.clone();
+            let _removed = new_report.remove(problem_idx);
+            let new_result = validate_report(&new_report);
+            dbg!(&new_report);
+            dbg!(&new_result);
+
+            if new_result {
+                //println!("found valid report by removing level {removed} at idx {problem_idx}");
+                return true;
+            }
+        }
+    }
+
+    //println!("found no valid report by removing any level");
+
+    false
+}
+
 pub(crate) fn part1(input: String) -> Result<String> {
     // error needs to be mapped, because it contains &str in it that outlive the lifetime of the input &str
     let (_, levels) = separated_list0(line_ending, parse_numbers)(input.as_str())
         .map_err(|e| anyhow::anyhow!("Parse error: {}", e))?;
 
-    let valid_report_count = levels.into_iter().filter(validate_level).count();
+    let valid_report_count = levels.into_iter().filter(validate_report).count();
 
     Ok(format!("{valid_report_count}"))
 }
 
 pub(crate) fn part2(input: String) -> Result<String> {
-    unimplemented!()
+    // error needs to be mapped, because it contains &str in it that outlive the lifetime of the input &str
+    let (_, reports) = separated_list0(line_ending, parse_numbers)(input.as_str())
+        .map_err(|e| anyhow::anyhow!("Parse error: {}", e))?;
+
+    assert_eq!(input.lines().count(), reports.len());
+
+    let valid_report_count = reports
+        .into_iter()
+        .filter(validate_report_with_problem_dampener)
+        .count();
+
+    Ok(format!("{valid_report_count}"))
 }
