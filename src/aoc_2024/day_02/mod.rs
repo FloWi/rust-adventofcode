@@ -3,7 +3,7 @@ use crate::parsers::parse_numbers;
 use anyhow::Result;
 use itertools::*;
 use nom::character::complete::line_ending;
-use nom::multi::separated_list0;
+use nom::multi::separated_list1;
 use std::fmt::Debug;
 
 #[derive(Eq, PartialOrd, PartialEq, Hash)]
@@ -70,22 +70,28 @@ fn validate_report_with_problem_dampener(report: &Vec<i32>) -> bool {
     false
 }
 
-pub(crate) fn part1(input: String) -> Result<String> {
+/// Report is a Vector of Levels
+type Report = Vec<i32>;
+
+fn parse_day02_input(input: &str) -> Result<Vec<Vec<i32>>> {
     // error needs to be mapped, because it contains &str in it that outlive the lifetime of the input &str
-    let (_, levels) = separated_list0(line_ending, parse_numbers)(input.as_str())
+
+    let (_, reports) = separated_list1(line_ending, parse_numbers)(input)
         .map_err(|e| anyhow::anyhow!("Parse error: {}", e))?;
 
-    let valid_report_count = levels.into_iter().filter(validate_report).count();
+    Ok(reports)
+}
+
+pub(crate) fn part1(input: String) -> Result<String> {
+    let reports = parse_day02_input(input.as_str())?;
+
+    let valid_report_count = reports.into_iter().filter(validate_report).count();
 
     Ok(format!("{valid_report_count}"))
 }
 
 pub(crate) fn part2(input: String) -> Result<String> {
-    // error needs to be mapped, because it contains &str in it that outlive the lifetime of the input &str
-    let (_, reports) = separated_list0(line_ending, parse_numbers)(input.as_str())
-        .map_err(|e| anyhow::anyhow!("Parse error: {}", e))?;
-
-    assert_eq!(input.lines().count(), reports.len());
+    let reports = parse_day02_input(input.as_str())?;
 
     let valid_report_count = reports
         .into_iter()
