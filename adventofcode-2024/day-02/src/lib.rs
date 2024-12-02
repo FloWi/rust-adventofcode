@@ -1,11 +1,29 @@
-use crate::aoc_2024::day_02::LevelCheckResult::{SafeDecreasing, SafeIncreasing, Unsafe};
-use anyhow::Result;
-use itertools::*;
+use crate::LevelCheckResult::*;
+use itertools::Itertools;
+use miette::miette;
 use nom::character::complete;
 use nom::character::complete::{newline, space1};
 use nom::multi::separated_list1;
 use nom::IResult;
-use std::fmt::Debug;
+
+pub mod part1;
+pub mod part2;
+
+/// Report is a Vector of Levels
+type Report = Vec<i32>;
+
+fn nom_parser(input: &str) -> IResult<&str, Vec<Report>> {
+    separated_list1(newline, separated_list1(space1, complete::i32))(input)
+}
+
+fn parse(input: &str) -> miette::Result<Vec<Report>> {
+    // error needs to be mapped, because it contains &str in it that outlive the lifetime of the input &str
+    let (_, reports) = nom_parser(input)
+        .map_err(|e| miette!("parse failed {}", e))?;
+
+
+    Ok(reports)
+}
 
 #[derive(Eq, PartialOrd, PartialEq, Hash)]
 enum LevelCheckResult {
@@ -69,37 +87,4 @@ fn validate_report_with_problem_dampener(report: &Vec<i32>) -> bool {
     //println!("found no valid report by removing any level");
 
     false
-}
-
-/// Report is a Vector of Levels
-type Report = Vec<i32>;
-
-fn parse_day02_input(input: &str) -> Result<Vec<Report>> {
-    // error needs to be mapped, because it contains &str in it that outlive the lifetime of the input &str
-    let (_, reports) = nom_parser(input).map_err(|e| anyhow::anyhow!("Parse error: {}", e))?;
-
-    Ok(reports)
-}
-
-fn nom_parser(input: &str) -> IResult<&str, Vec<Report>> {
-    separated_list1(newline, separated_list1(space1, complete::i32))(input)
-}
-
-pub(crate) fn part1(input: String) -> Result<String> {
-    let reports = parse_day02_input(input.as_str())?;
-
-    let valid_report_count = reports.into_iter().filter(validate_report).count();
-
-    Ok(format!("{valid_report_count}"))
-}
-
-pub(crate) fn part2(input: String) -> Result<String> {
-    let reports = parse_day02_input(input.as_str())?;
-
-    let valid_report_count = reports
-        .into_iter()
-        .filter(validate_report_with_problem_dampener)
-        .count();
-
-    Ok(format!("{valid_report_count}"))
 }
