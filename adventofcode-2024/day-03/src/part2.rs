@@ -1,7 +1,19 @@
+use itertools::Itertools;
+use miette::miette;
+use crate::MultiplyOperation;
+
 #[tracing::instrument]
-pub fn process(_input: &str) -> miette::Result<String> {
-    todo!("day 01 - part 2");
+pub fn process(input: &str) -> miette::Result<String> {
+    let (_, operations) = crate::all_mul_ops_parser(input)
+        .map_err(|e| miette!("parse failed {}", e))?;
+
+    // dbg!(&operations);
+
+    let result: i32 = operations.iter().map(|MultiplyOperation(x, y )| x*y).sum();
+
+    Ok(format!("{result}"))
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -9,12 +21,11 @@ mod tests {
 
     #[test]
     fn test_process() -> miette::Result<()> {
-        todo!("haven't built test yet");
         let input = r#"
-input_goes_here_and_will_be_trimmed
+xmul(2,4)&mul[3,7]!^don't()_mul(5,5)+mul(32,64](mul(11,8)undo()?mul(8,5))
         "#
-        .trim();
-        assert_eq!("", process(input)?);
+            .trim();
+        assert_eq!("161", process(input)?);
         Ok(())
     }
 }
