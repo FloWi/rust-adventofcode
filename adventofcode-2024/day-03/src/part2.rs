@@ -1,4 +1,4 @@
-use crate::{Instruction, MultiplyOperation};
+use crate::Instruction;
 use itertools::Itertools;
 use miette::miette;
 
@@ -15,18 +15,15 @@ pub fn process(input: &str) -> miette::Result<String> {
         match instruction {
             Instruction::SetEnabled => is_enabled = true,
             Instruction::SetDisabled => is_enabled = false,
-            Instruction::Work(operation) => {
+            Instruction::MultiplyOperation(x, y) => {
                 if is_enabled {
-                    enabled_operations.push(operation)
+                    enabled_operations.push((x, y))
                 }
             }
         }
     }
 
-    let result: i32 = enabled_operations
-        .iter()
-        .map(|MultiplyOperation(x, y)| x * y)
-        .sum();
+    let result: i32 = enabled_operations.iter().map(|(x, y)| x * y).sum();
 
     Ok(format!("{result}"))
 }

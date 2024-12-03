@@ -1,4 +1,4 @@
-use crate::{all_mul_ops_parser, MultiplyOperation};
+use crate::{all_mul_ops_parser, Instruction};
 use itertools::Itertools;
 use miette::miette;
 
@@ -8,7 +8,13 @@ pub fn process(input: &str) -> miette::Result<String> {
 
     // dbg!(&operations);
 
-    let result: i32 = operations.iter().map(|MultiplyOperation(x, y)| x * y).sum();
+    let result: i32 = operations
+        .iter()
+        .map(|ins| match ins {
+            Instruction::MultiplyOperation(x, y) => x * y,
+            _ => 0,
+        })
+        .sum();
 
     Ok(format!("{result}"))
 }
