@@ -9,17 +9,11 @@ use nom::{
     IResult,
 };
 
-pub fn parse(
-    input: &str,
-) -> IResult<&str, (Vec<i32>, Vec<i32>)> {
+pub fn parse(input: &str) -> IResult<&str, (Vec<i32>, Vec<i32>)> {
     let mut it = iterator(
         input,
         terminated(
-            separated_pair(
-                complete::i32,
-                space1,
-                complete::i32,
-            ),
+            separated_pair(complete::i32, space1, complete::i32),
             opt(newline),
         ),
     );

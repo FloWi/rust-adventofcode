@@ -1,12 +1,11 @@
+use crate::parse;
 use itertools::Itertools;
 use miette::miette;
 use tracing::info;
-use crate::parse;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
-    let (_, (left, right)) = parse(input)
-        .map_err(|e| miette!("parse failed {}", e))?;
+    let (_, (left, right)) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
 
     let right_counts = right.iter().counts();
     let similarity_scores = left
@@ -38,7 +37,7 @@ mod tests {
 3   9
 3   3
         "#
-            .trim();
+        .trim();
         assert_eq!("31", process(input)?);
         Ok(())
     }

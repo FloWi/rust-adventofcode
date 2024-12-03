@@ -18,9 +18,7 @@ fn nom_parser(input: &str) -> IResult<&str, Vec<Report>> {
 
 fn parse(input: &str) -> miette::Result<Vec<Report>> {
     // error needs to be mapped, because it contains &str in it that outlive the lifetime of the input &str
-    let (_, reports) = nom_parser(input)
-        .map_err(|e| miette!("parse failed {}", e))?;
-
+    let (_, reports) = nom_parser(input).map_err(|e| miette!("parse failed {}", e))?;
 
     Ok(reports)
 }

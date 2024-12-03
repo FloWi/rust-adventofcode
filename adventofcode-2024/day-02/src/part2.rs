@@ -5,7 +5,10 @@ use itertools::Itertools;
 pub fn process(input: &str) -> miette::Result<String> {
     let reports = parse(input)?;
 
-    let valid_report_count = reports.into_iter().filter(validate_report_with_problem_dampener).count();
+    let valid_report_count = reports
+        .into_iter()
+        .filter(validate_report_with_problem_dampener)
+        .count();
 
     Ok(format!("{valid_report_count}"))
 }
@@ -24,7 +27,7 @@ mod tests {
 8 6 4 4 1
 1 3 6 7 9
         "#
-            .trim();
+        .trim();
         assert_eq!("4", process(input)?);
         Ok(())
     }
