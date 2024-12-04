@@ -84,13 +84,13 @@ fn check_both_matchers_at_location(lines: &Vec<Vec<char>>, matcher1: &Vec<CharMa
 fn check_match_for_char(cm: &CharMatcher, lines: &Vec<Vec<char>>, x: i32, y: i32, width: &i32, height: &i32) -> bool {
     let x = x + cm.x_offset;
     let y = y + cm.y_offset;
-    let result = if y < 0 || x < 0 || y > height - 1 || x > width - 1 {
+    
+    if y < 0 || x < 0 || y > height - 1 || x > width - 1 {
         false
     } else {
         let char_to_test = lines[y as usize][x as usize];
         cm.char_to_match == char_to_test
-    };
-    result
+    }
 }
 fn find_matches_for_matcher(lines: &Vec<Vec<char>>, matcher1: &Vec<CharMatcher>, matcher2: &Vec<CharMatcher>, width: &i32, height: &i32) -> Vec<(i32, i32)> {
     let mut matching_locations = Vec::new();
