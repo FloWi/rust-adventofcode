@@ -46,17 +46,10 @@ fn count_appearances(input: &str) -> usize {
 
     let i32_char_indices: Vec<(i32, char)> = "MAS".char_indices().map(|(o, char)| (o as i32, char)).collect_vec();
 
-
     let north_east = create_matcher_by_direction(NE, &i32_char_indices);
     let south_east = create_matcher_by_direction(SE, &i32_char_indices);
     let south_west = create_matcher_by_direction(SW, &i32_char_indices);
     let north_west = create_matcher_by_direction(NW, &i32_char_indices);
-
-
-    dbg!(&north_east);
-    dbg!(&south_east);
-    dbg!(&south_west);
-    dbg!(&north_west);
 
     let lines = input.lines().map(|line| line.chars().collect_vec()).collect_vec();
 
@@ -64,11 +57,6 @@ fn count_appearances(input: &str) -> usize {
     let se_sw_count = find_matches(&lines, &south_east, &south_west, "se_sw");
     let nw_sw_count = find_matches(&lines, &north_west, &south_west, "nw_sw");
     let ne_nw_count = find_matches(&lines, &north_east, &north_west, "se_nw");
-
-    dbg!(ne_se_count);
-    dbg!(se_sw_count);
-    dbg!(nw_sw_count);
-    dbg!(ne_nw_count);
 
     ne_se_count + se_sw_count + nw_sw_count + ne_nw_count
 }
@@ -100,7 +88,6 @@ fn check_match_for_char(cm: &CharMatcher, lines: &Vec<Vec<char>>, x: i32, y: i32
         false
     } else {
         let char_to_test = lines[y as usize][x as usize];
-        //println!("checking for {} at location ({x}, {y}). {}", cm.char_to_match, char_to_test);
         cm.char_to_match == char_to_test
     };
     result
@@ -113,7 +100,6 @@ fn find_matches_for_matcher(lines: &Vec<Vec<char>>, matcher1: &Vec<CharMatcher>,
             let is_match = check_both_matchers_at_location(lines, matcher1, matcher2, width, height, x, y);
 
             if is_match {
-                println!("found match at ({x}, {y})");
                 matching_locations.push((x, y));
             }
         }
@@ -126,17 +112,6 @@ fn find_matches(lines: &Vec<Vec<char>>, matcher1: &Vec<CharMatcher>, matcher2: &
     let width = lines.first().map(|line| line.len()).unwrap_or(0) as i32;
 
     let matches = find_matches_for_matcher(lines, matcher1, matcher2, &width, &height);
-
-    dbg!(label);
-
-    if matches.is_empty() == false {
-        dbg!(format!("{} Matches", matches.len()));
-        dbg!(matcher1);
-        dbg!(matcher2);
-        dbg!(&matches);
-    } else {
-        dbg!("No Matches");
-    }
 
     matches.len()
 }
@@ -177,9 +152,6 @@ M.M.M.M.M.
         let lines = input.lines().map(|line| line.chars().collect_vec()).collect_vec();
         let height = lines.len() as i32;
         let width = lines.first().map(|line| line.len()).unwrap_or(0) as i32;
-        //
-        // let actual = check_both_matchers_at_location(&lines, &south_east, &south_west, &width, &height, 6, 2);
-        // assert!(actual);
 
         let actual = check_both_matchers_at_location(&lines, &north_east, &north_west, &width, &height, 7, 2);
         assert!(actual);
@@ -188,36 +160,6 @@ M.M.M.M.M.
 
     #[test]
     fn test_process() -> miette::Result<()> {
-
-        // expected matches
-        let expected_locations = vec![
-            (2, 1),
-            (6, 2),
-            (7, 2),
-            (2, 3),
-            (4, 3),
-            (1, 7),
-            (3, 7),
-            (5, 7),
-            (7, 7),
-        ];
-
-        /*
-found match at (2, 1)
-found match at (2, 3)
-found match at (6, 2)
-found match at (4, 3)
-
-         */
-        let actual_locations = vec![
-            (6, 2),
-            (7, 2),
-            (4, 3),
-            (1, 7),
-            (3, 7),
-            (5, 7),
-            (7, 7),
-        ];
 
         let input = r#"
 .M.S......

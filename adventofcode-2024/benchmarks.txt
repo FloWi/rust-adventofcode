@@ -14,8 +14,8 @@ running 0 tests
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 day_01_bench  fastest       │ slowest       │ median        │ mean          │ samples │ iters
-├─ part1      45.7 µs       │ 116.8 µs      │ 47.49 µs      │ 47.99 µs      │ 100     │ 100
-╰─ part2      57.91 µs      │ 78.66 µs      │ 61.22 µs      │ 61.81 µs      │ 100     │ 100
+├─ part1      43.99 µs      │ 86.74 µs      │ 44.27 µs      │ 44.97 µs      │ 100     │ 100
+╰─ part2      56.24 µs      │ 66.2 µs       │ 59.45 µs      │ 59.58 µs      │ 100     │ 100
 
 
 running 2 tests
@@ -33,6 +33,44 @@ running 0 tests
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 day_02_bench  fastest       │ slowest       │ median        │ mean          │ samples │ iters
-├─ part1      232.2 µs      │ 315.1 µs      │ 237 µs        │ 239.1 µs      │ 100     │ 100
-╰─ part2      647 µs        │ 688.8 µs      │ 652.9 µs      │ 658.9 µs      │ 100     │ 100
+├─ part1      231.6 µs      │ 265.2 µs      │ 232.4 µs      │ 233.4 µs      │ 100     │ 100
+╰─ part2      647.3 µs      │ 681.8 µs      │ 649.6 µs      │ 655.9 µs      │ 100     │ 100
+
+
+running 2 tests
+ii
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+day_03_bench  fastest       │ slowest       │ median        │ mean          │ samples │ iters
+├─ part1      116.5 µs      │ 159.2 µs      │ 116.7 µs      │ 117.8 µs      │ 100     │ 100
+╰─ part2      145 µs        │ 167.2 µs      │ 145.3 µs      │ 146.3 µs      │ 100     │ 100
+
+
+running 3 tests
+iii
+test result: ok. 0 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+day_04_bench  fastest       │ slowest       │ median        │ mean          │ samples │ iters
+├─ part1      706.2 µs      │ 815.2 µs      │ 719.4 µs      │ 728.4 µs      │ 100     │ 100
+╰─ part2      867 µs        │ 976.9 µs      │ 871.1 µs      │ 877.3 µs      │ 100     │ 100
 
