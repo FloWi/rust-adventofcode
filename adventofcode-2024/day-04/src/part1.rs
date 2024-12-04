@@ -9,15 +9,23 @@ pub fn process(input: &str) -> miette::Result<String> {
 
 struct CharMatcher {
     char_to_match: char,
-    x_offset: usize,
-    y_offset: usize,
+    x_offset: i32,
+    y_offset: i32,
 }
 
 fn count_appearances(word: &str, input: &str) -> usize {
-    let east = word.char_indices().map(|(o, char)| CharMatcher { char_to_match: char, x_offset: o, y_offset: 0 }).collect_vec();
-    let west = word.char_indices().map(|(o, char)| CharMatcher { char_to_match: char, x_offset: word.len() - o, y_offset: 0 }).collect_vec();
-    let south = word.char_indices().map(|(o, char)| CharMatcher { char_to_match: char, x_offset: 0, y_offset: o }).collect_vec();
-    let north = word.char_indices().map(|(o, char)| CharMatcher { char_to_match: char, x_offset: 0, y_offset: word.len() - o }).collect_vec();
+
+    let i32_char_indices: Vec<(i32, char)> =  word.char_indices().map(|(o, char)| (o as i32, char) ).collect_vec();
+
+    let east = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: *o, y_offset: 0 }).collect_vec();
+    let west = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: - *o, y_offset: 0 }).collect_vec();
+    let south = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: 0, y_offset: *o }).collect_vec();
+    let north = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: 0, y_offset: - o }).collect_vec();
+
+    let north_east = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: *o, y_offset: -o }).collect_vec();
+    let south_east = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: *o, y_offset: *o }).collect_vec();
+    let south_west = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: -o, y_offset: *o }).collect_vec();
+    let north_west = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: -o, y_offset: -o }).collect_vec();
 
     let lines = input.lines().map(|line| line.chars().collect_vec()).collect_vec();
 
@@ -26,30 +34,41 @@ fn count_appearances(word: &str, input: &str) -> usize {
     let south_count = count_matches(&lines, &south);
     let north_count = count_matches(&lines, &north);
 
+    let north_east_count = count_matches(&lines, &north_east);
+    let south_east_count = count_matches(&lines, &south_east);
+    let south_west_count = count_matches(&lines, &south_west);
+    let north_west_count = count_matches(&lines, &north_west);
+
 
     dbg!(east_count);
     dbg!(west_count);
     dbg!(south_count);
     dbg!(north_count);
+    dbg!(north_east_count);
+    dbg!(south_east_count);
+    dbg!(south_west_count);
+    dbg!(north_west_count);
 
-    east_count + west_count + south_count + north_count
+
+
+    east_count + west_count + south_count + north_count + north_east_count + south_east_count + south_west_count + north_west_count
 }
 
 fn count_matches(lines: &Vec<Vec<char>>, matcher: &Vec<CharMatcher>) -> usize {
-    let height = lines.len();
-    let width = lines.first().map(|line| line.len()).unwrap_or(0);
+    let height = lines.len() as i32;
+    let width = lines.first().map(|line| line.len()).unwrap_or(0) as i32;
 
     let mut count = 0;
 
     for y in 0..height {
         for x in 0..width  {
             let found_match = matcher.iter().all(|cm| {
-                let x = x + cm.x_offset;
-                let y = y + cm.y_offset;
-                if y > height - 1 || x > width - 1 {
+                let x = x as i32 + cm.x_offset;
+                let y = y as i32 + cm.y_offset;
+                if y < 0 || x < 0 || y > height - 1 || x > width - 1 {
                     false
                 } else {
-                    let char_to_test = lines[y][x];
+                    let char_to_test = lines[y as usize][x as usize];
                     cm.char_to_match == char_to_test
                 }
             });
@@ -97,7 +116,7 @@ S.S.S.S.SS
 .X.X.XMASX
         "#
             .trim();
-        assert_eq!("", process(input)?);
+        assert_eq!("18", process(input)?);
         Ok(())
     }
 }
