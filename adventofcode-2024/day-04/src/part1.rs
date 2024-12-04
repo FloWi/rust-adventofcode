@@ -63,8 +63,8 @@ fn count_matches(lines: &Vec<Vec<char>>, matcher: &Vec<CharMatcher>) -> usize {
     for y in 0..height {
         for x in 0..width  {
             let found_match = matcher.iter().all(|cm| {
-                let x = x as i32 + cm.x_offset;
-                let y = y as i32 + cm.y_offset;
+                let x = x + cm.x_offset;
+                let y = y + cm.y_offset;
                 if y < 0 || x < 0 || y > height - 1 || x > width - 1 {
                     false
                 } else {
