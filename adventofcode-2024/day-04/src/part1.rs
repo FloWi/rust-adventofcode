@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
-    let count = count_appearances( "XMAS" , input);
+    let count = count_appearances("XMAS", input);
 
     Ok(count.to_string())
 }
@@ -14,20 +14,81 @@ struct CharMatcher {
 }
 
 fn count_appearances(word: &str, input: &str) -> usize {
+    let i32_char_indices: Vec<(i32, char)> = word
+        .char_indices()
+        .map(|(o, char)| (o as i32, char))
+        .collect_vec();
 
-    let i32_char_indices: Vec<(i32, char)> =  word.char_indices().map(|(o, char)| (o as i32, char) ).collect_vec();
+    let east = i32_char_indices
+        .iter()
+        .map(|(o, char)| CharMatcher {
+            char_to_match: *char,
+            x_offset: *o,
+            y_offset: 0,
+        })
+        .collect_vec();
+    let west = i32_char_indices
+        .iter()
+        .map(|(o, char)| CharMatcher {
+            char_to_match: *char,
+            x_offset: -*o,
+            y_offset: 0,
+        })
+        .collect_vec();
+    let south = i32_char_indices
+        .iter()
+        .map(|(o, char)| CharMatcher {
+            char_to_match: *char,
+            x_offset: 0,
+            y_offset: *o,
+        })
+        .collect_vec();
+    let north = i32_char_indices
+        .iter()
+        .map(|(o, char)| CharMatcher {
+            char_to_match: *char,
+            x_offset: 0,
+            y_offset: -o,
+        })
+        .collect_vec();
 
-    let east = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: *o, y_offset: 0 }).collect_vec();
-    let west = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: - *o, y_offset: 0 }).collect_vec();
-    let south = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: 0, y_offset: *o }).collect_vec();
-    let north = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: 0, y_offset: - o }).collect_vec();
+    let north_east = i32_char_indices
+        .iter()
+        .map(|(o, char)| CharMatcher {
+            char_to_match: *char,
+            x_offset: *o,
+            y_offset: -o,
+        })
+        .collect_vec();
+    let south_east = i32_char_indices
+        .iter()
+        .map(|(o, char)| CharMatcher {
+            char_to_match: *char,
+            x_offset: *o,
+            y_offset: *o,
+        })
+        .collect_vec();
+    let south_west = i32_char_indices
+        .iter()
+        .map(|(o, char)| CharMatcher {
+            char_to_match: *char,
+            x_offset: -o,
+            y_offset: *o,
+        })
+        .collect_vec();
+    let north_west = i32_char_indices
+        .iter()
+        .map(|(o, char)| CharMatcher {
+            char_to_match: *char,
+            x_offset: -o,
+            y_offset: -o,
+        })
+        .collect_vec();
 
-    let north_east = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: *o, y_offset: -o }).collect_vec();
-    let south_east = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: *o, y_offset: *o }).collect_vec();
-    let south_west = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: -o, y_offset: *o }).collect_vec();
-    let north_west = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: -o, y_offset: -o }).collect_vec();
-
-    let lines = input.lines().map(|line| line.chars().collect_vec()).collect_vec();
+    let lines = input
+        .lines()
+        .map(|line| line.chars().collect_vec())
+        .collect_vec();
 
     let east_count = count_matches(&lines, &east);
     let west_count = count_matches(&lines, &west);
@@ -39,7 +100,6 @@ fn count_appearances(word: &str, input: &str) -> usize {
     let south_west_count = count_matches(&lines, &south_west);
     let north_west_count = count_matches(&lines, &north_west);
 
-
     dbg!(east_count);
     dbg!(west_count);
     dbg!(south_count);
@@ -49,9 +109,14 @@ fn count_appearances(word: &str, input: &str) -> usize {
     dbg!(south_west_count);
     dbg!(north_west_count);
 
-
-
-    east_count + west_count + south_count + north_count + north_east_count + south_east_count + south_west_count + north_west_count
+    east_count
+        + west_count
+        + south_count
+        + north_count
+        + north_east_count
+        + south_east_count
+        + south_west_count
+        + north_west_count
 }
 
 fn count_matches(lines: &Vec<Vec<char>>, matcher: &Vec<CharMatcher>) -> usize {
@@ -61,7 +126,7 @@ fn count_matches(lines: &Vec<Vec<char>>, matcher: &Vec<CharMatcher>) -> usize {
     let mut count = 0;
 
     for y in 0..height {
-        for x in 0..width  {
+        for x in 0..width {
             let found_match = matcher.iter().all(|cm| {
                 let x = x + cm.x_offset;
                 let y = y + cm.y_offset;
@@ -73,8 +138,8 @@ fn count_matches(lines: &Vec<Vec<char>>, matcher: &Vec<CharMatcher>) -> usize {
                 }
             });
 
-            if found_match  {
-                count +=1;
+            if found_match {
+                count += 1;
             }
         }
     }
@@ -100,7 +165,7 @@ SAXAMASAAA
 MAMMMXMMMM
 MXMXAXMASX
         "#
-            .trim();
+        .trim();
 
         // same as above, but irrelevant characters removed
         let input = r#"
@@ -115,7 +180,7 @@ S.S.S.S.SS
 ..M.M.M.MM
 .X.X.XMASX
         "#
-            .trim();
+        .trim();
         assert_eq!("18", process(input)?);
         Ok(())
     }

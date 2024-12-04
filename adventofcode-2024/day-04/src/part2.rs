@@ -28,10 +28,22 @@ impl Direction {
     }
 }
 
-const NE: Direction = Direction { x_offset: 1, y_offset: -1 };
-const NW: Direction = Direction { x_offset: -1, y_offset: -1 };
-const SE: Direction = Direction { x_offset: 1, y_offset: 1 };
-const SW: Direction = Direction { x_offset: -1, y_offset: 1 };
+const NE: Direction = Direction {
+    x_offset: 1,
+    y_offset: -1,
+};
+const NW: Direction = Direction {
+    x_offset: -1,
+    y_offset: -1,
+};
+const SE: Direction = Direction {
+    x_offset: 1,
+    y_offset: 1,
+};
+const SW: Direction = Direction {
+    x_offset: -1,
+    y_offset: 1,
+};
 
 fn count_appearances(input: &str) -> usize {
     /*
@@ -44,14 +56,20 @@ fn count_appearances(input: &str) -> usize {
     M.S
      */
 
-    let i32_char_indices: Vec<(i32, char)> = "MAS".char_indices().map(|(o, char)| (o as i32, char)).collect_vec();
+    let i32_char_indices: Vec<(i32, char)> = "MAS"
+        .char_indices()
+        .map(|(o, char)| (o as i32, char))
+        .collect_vec();
 
     let north_east = create_matcher_by_direction(NE, &i32_char_indices);
     let south_east = create_matcher_by_direction(SE, &i32_char_indices);
     let south_west = create_matcher_by_direction(SW, &i32_char_indices);
     let north_west = create_matcher_by_direction(NW, &i32_char_indices);
 
-    let lines = input.lines().map(|line| line.chars().collect_vec()).collect_vec();
+    let lines = input
+        .lines()
+        .map(|line| line.chars().collect_vec())
+        .collect_vec();
 
     let ne_se_count = find_matches(&lines, &north_east, &south_east, "ne_se");
     let se_sw_count = find_matches(&lines, &south_east, &south_west, "se_sw");
@@ -61,30 +79,55 @@ fn count_appearances(input: &str) -> usize {
     ne_se_count + se_sw_count + nw_sw_count + ne_nw_count
 }
 
-fn create_matcher_by_direction(direction: Direction, i32_char_indices: &Vec<(i32, char)>) -> Vec<CharMatcher> {
+fn create_matcher_by_direction(
+    direction: Direction,
+    i32_char_indices: &Vec<(i32, char)>,
+) -> Vec<CharMatcher> {
     // everything needs to centered around the A (0,0).
     // If we are creating the SE matcher, we need to find the starting_point by going in the opposite direction (NW)
 
     let start = direction.reverse();
-    let result = i32_char_indices.iter().map(|(o, char)| CharMatcher { char_to_match: *char, x_offset: start.x_offset + direction.x_offset * o, y_offset: start.y_offset + direction.y_offset * o }).collect_vec();
+    let result = i32_char_indices
+        .iter()
+        .map(|(o, char)| CharMatcher {
+            char_to_match: *char,
+            x_offset: start.x_offset + direction.x_offset * o,
+            y_offset: start.y_offset + direction.y_offset * o,
+        })
+        .collect_vec();
     result
 }
 
-fn check_both_matchers_at_location(lines: &Vec<Vec<char>>, matcher1: &Vec<CharMatcher>, matcher2: &Vec<CharMatcher>, width: &i32, height: &i32, x: i32, y: i32) -> bool {
-    let found_match_1 = matcher1.iter().all(|cm| {
-        check_match_for_char(cm, lines, x, y, width, height)
-    });
-    let found_match_2 = matcher2.iter().all(|cm| {
-        check_match_for_char(cm, lines, x, y, width, height)
-    });
+fn check_both_matchers_at_location(
+    lines: &Vec<Vec<char>>,
+    matcher1: &Vec<CharMatcher>,
+    matcher2: &Vec<CharMatcher>,
+    width: &i32,
+    height: &i32,
+    x: i32,
+    y: i32,
+) -> bool {
+    let found_match_1 = matcher1
+        .iter()
+        .all(|cm| check_match_for_char(cm, lines, x, y, width, height));
+    let found_match_2 = matcher2
+        .iter()
+        .all(|cm| check_match_for_char(cm, lines, x, y, width, height));
 
     found_match_1 && found_match_2
 }
 
-fn check_match_for_char(cm: &CharMatcher, lines: &Vec<Vec<char>>, x: i32, y: i32, width: &i32, height: &i32) -> bool {
+fn check_match_for_char(
+    cm: &CharMatcher,
+    lines: &Vec<Vec<char>>,
+    x: i32,
+    y: i32,
+    width: &i32,
+    height: &i32,
+) -> bool {
     let x = x + cm.x_offset;
     let y = y + cm.y_offset;
-    
+
     if y < 0 || x < 0 || y > height - 1 || x > width - 1 {
         false
     } else {
@@ -92,12 +135,19 @@ fn check_match_for_char(cm: &CharMatcher, lines: &Vec<Vec<char>>, x: i32, y: i32
         cm.char_to_match == char_to_test
     }
 }
-fn find_matches_for_matcher(lines: &Vec<Vec<char>>, matcher1: &Vec<CharMatcher>, matcher2: &Vec<CharMatcher>, width: &i32, height: &i32) -> Vec<(i32, i32)> {
+fn find_matches_for_matcher(
+    lines: &Vec<Vec<char>>,
+    matcher1: &Vec<CharMatcher>,
+    matcher2: &Vec<CharMatcher>,
+    width: &i32,
+    height: &i32,
+) -> Vec<(i32, i32)> {
     let mut matching_locations = Vec::new();
 
     for y in 0..*height {
         for x in 0..*width {
-            let is_match = check_both_matchers_at_location(lines, matcher1, matcher2, width, height, x, y);
+            let is_match =
+                check_both_matchers_at_location(lines, matcher1, matcher2, width, height, x, y);
 
             if is_match {
                 matching_locations.push((x, y));
@@ -107,7 +157,12 @@ fn find_matches_for_matcher(lines: &Vec<Vec<char>>, matcher1: &Vec<CharMatcher>,
     matching_locations
 }
 
-fn find_matches(lines: &Vec<Vec<char>>, matcher1: &Vec<CharMatcher>, matcher2: &Vec<CharMatcher>, label: &str) -> usize {
+fn find_matches(
+    lines: &Vec<Vec<char>>,
+    matcher1: &Vec<CharMatcher>,
+    matcher2: &Vec<CharMatcher>,
+    label: &str,
+) -> usize {
     let height = lines.len() as i32;
     let width = lines.first().map(|line| line.len()).unwrap_or(0) as i32;
 
@@ -134,10 +189,12 @@ S.S.S.S.S.
 M.M.M.M.M.
 ..........
         "#
-            .trim();
+        .trim();
 
-        let i32_char_indices: Vec<(i32, char)> = "MAS".char_indices().map(|(o, char)| (o as i32, char)).collect_vec();
-
+        let i32_char_indices: Vec<(i32, char)> = "MAS"
+            .char_indices()
+            .map(|(o, char)| (o as i32, char))
+            .collect_vec();
 
         let north_east = create_matcher_by_direction(NE, &i32_char_indices);
         let south_east = create_matcher_by_direction(SE, &i32_char_indices);
@@ -149,18 +206,28 @@ M.M.M.M.M.
         dbg!(&south_west);
         dbg!(&north_west);
 
-        let lines = input.lines().map(|line| line.chars().collect_vec()).collect_vec();
+        let lines = input
+            .lines()
+            .map(|line| line.chars().collect_vec())
+            .collect_vec();
         let height = lines.len() as i32;
         let width = lines.first().map(|line| line.len()).unwrap_or(0) as i32;
 
-        let actual = check_both_matchers_at_location(&lines, &north_east, &north_west, &width, &height, 7, 2);
+        let actual = check_both_matchers_at_location(
+            &lines,
+            &north_east,
+            &north_west,
+            &width,
+            &height,
+            7,
+            2,
+        );
         assert!(actual);
         Ok(())
     }
 
     #[test]
     fn test_process() -> miette::Result<()> {
-
         let input = r#"
 .M.S......
 ..A..MSMS.
@@ -173,7 +240,7 @@ S.S.S.S.S.
 M.M.M.M.M.
 ..........
         "#
-            .trim();
+        .trim();
         assert_eq!("9", process(input)?);
         Ok(())
     }
