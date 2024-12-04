@@ -1,5 +1,4 @@
 use crate::{all_mul_ops_parser, Instruction};
-use itertools::Itertools;
 use miette::miette;
 
 #[tracing::instrument]

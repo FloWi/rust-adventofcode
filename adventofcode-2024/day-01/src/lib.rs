@@ -1,7 +1,6 @@
 pub mod part1;
 pub mod part2;
 
-use miette::miette;
 use nom::{
     character::complete::{self, newline, space1},
     combinator::{iterator, opt},

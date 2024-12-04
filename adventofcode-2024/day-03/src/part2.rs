@@ -1,5 +1,4 @@
 use crate::Instruction;
-use itertools::Itertools;
 use miette::miette;
 
 #[tracing::instrument]

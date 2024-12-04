@@ -1,5 +1,4 @@
-use crate::{parse, validate_report, validate_report_with_problem_dampener};
-use itertools::Itertools;
+use crate::{parse, validate_report_with_problem_dampener};
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {

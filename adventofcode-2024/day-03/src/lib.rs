@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete;

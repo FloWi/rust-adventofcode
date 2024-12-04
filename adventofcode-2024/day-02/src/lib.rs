@@ -32,20 +32,18 @@ enum LevelCheckResult {
 
 fn validate_report(report: &Vec<i32>) -> bool {
     let analysis = report
-        .into_iter()
+        .iter()
         .tuple_windows()
         .map(|(n1, n2)| {
             let diff = (n1 - n2).abs();
             if !(1..=3).contains(&diff) {
                 Unsafe
+            } else if n1 > n2 {
+                SafeDecreasing
+            } else if n1 < n2 {
+                SafeIncreasing
             } else {
-                if n1 > n2 {
-                    SafeDecreasing
-                } else if n1 < n2 {
-                    SafeIncreasing
-                } else {
-                    Unsafe
-                }
+                Unsafe
             }
         })
         .counts();
@@ -57,14 +55,14 @@ fn validate_report(report: &Vec<i32>) -> bool {
     let no_unsafe = num_unsafe == 0;
     let only_increasing = num_safe_increasing > 0 && num_safe_decreasing == 0;
     let only_decreasing = num_safe_increasing == 0 && num_safe_decreasing > 0;
-    let is_valid = (only_increasing || only_decreasing) && no_unsafe;
-    is_valid
+
+    (only_increasing || only_decreasing) && no_unsafe
 }
 
 fn validate_report_with_problem_dampener(report: &Vec<i32>) -> bool {
-    let result = validate_report(&report);
+    let result = validate_report(report);
 
-    if result == true {
+    if result {
         //println("initial report is valid - no need to remove a level");
         return true;
     } else {
