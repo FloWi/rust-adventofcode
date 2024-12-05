@@ -23,24 +23,22 @@ fn has_correct_order(pages: &PageNumbersForUpdate, rules: &[PageOrderingRule]) -
 
 #[derive(Debug, Clone)]
 struct UpdateBreaker {
-    rule: PageOrderingRule,
     idx_1: usize,
     idx_2: usize,
 }
+
 fn find_first_rule_that_breaks_update(
-    pages: &PageNumbersForUpdate,
+    PageNumbersForUpdate(pages): &PageNumbersForUpdate,
     rules: &[PageOrderingRule],
 ) -> Option<UpdateBreaker> {
     rules
         .iter()
-        .find_map(|rule @ PageOrderingRule(first, second)| {
+        .find_map(|PageOrderingRule(first, second)| {
             let maybe_first_idx = pages
-                .0
                 .iter()
                 .find_position(|p| *p == first)
                 .map(|(idx, _)| idx);
             let maybe_second_idx = pages
-                .0
                 .iter()
                 .find_position(|p| *p == second)
                 .map(|(idx, _)| idx);
@@ -49,7 +47,6 @@ fn find_first_rule_that_breaks_update(
                 Some((idx_1, idx_2)) => {
                     if idx_1 > idx_2 {
                         Some(UpdateBreaker {
-                            rule: (*rule).clone(),
                             idx_1,
                             idx_2,
                         })
