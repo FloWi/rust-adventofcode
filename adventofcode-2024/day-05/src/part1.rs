@@ -10,7 +10,7 @@ pub fn process(input: &str) -> miette::Result<String> {
 
     let valid_updates = pages_list
         .iter()
-        .filter(|pages| crate::has_correct_order(*pages, ordering_rules.as_slice()))
+        .filter(|pages| crate::has_correct_order(pages, ordering_rules.as_slice()))
         .collect_vec();
 
     let result: i32 = valid_updates

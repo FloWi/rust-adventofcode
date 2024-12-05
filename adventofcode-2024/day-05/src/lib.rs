@@ -81,7 +81,7 @@ fn parse(input: &str) -> IResult<&str, (Vec<PageOrderingRule>, Vec<PageNumbersFo
     );
     let pages_parser = separated_list1(
         newline,
-        separated_list1(char(','), complete::i32).map(|pages| PageNumbersForUpdate(pages)),
+        separated_list1(char(','), complete::i32).map(PageNumbersForUpdate),
     );
 
     let (remaining, result) =

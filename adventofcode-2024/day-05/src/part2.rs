@@ -5,7 +5,6 @@ use crate::{
 use itertools::Itertools;
 use miette::miette;
 use std::collections::HashSet;
-use tracing::{debug, info};
 
 //#[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
@@ -14,12 +13,12 @@ pub fn process(input: &str) -> miette::Result<String> {
 
     let invalid_updates = pages_list
         .iter()
-        .filter(|pages| false == has_correct_order(*pages, ordering_rules.as_slice()))
+        .filter(|pages| !has_correct_order(pages, ordering_rules.as_slice()))
         .collect_vec();
 
     let repaired_updates: Vec<_> = invalid_updates
         .iter()
-        .map(|pages| make_valid(*pages, ordering_rules.as_slice()))
+        .map(|pages| make_valid(pages, ordering_rules.as_slice()))
         .collect();
 
     let result: i32 = repaired_updates
@@ -62,7 +61,7 @@ fn make_valid(
 
     let pages_set: HashSet<&i32> = HashSet::from_iter(invalid_update.0.iter());
     let relevant_rules: Vec<PageOrderingRule> = rules
-        .into_iter()
+        .iter()
         .filter(|PageOrderingRule(first, second)| {
             pages_set.contains(first) && pages_set.contains(second)
         })
