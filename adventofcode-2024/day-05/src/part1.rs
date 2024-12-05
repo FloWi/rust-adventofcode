@@ -1,21 +1,17 @@
+use crate::{parse, PageNumbersForUpdate};
 use itertools::Itertools;
 use miette::miette;
 use nom::Parser;
-use crate::{parse, PageNumbersForUpdate};
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
     let (_rest, (ordering_rules, pages_list)) =
         parse(input).map_err(|e| miette!("parse failed {}", e))?;
 
-    dbg!(&ordering_rules);
-    dbg!(&pages_list);
-
     let valid_updates = pages_list
         .iter()
         .filter(|pages| crate::has_correct_order(*pages, ordering_rules.as_slice()))
         .collect_vec();
-    dbg!(&valid_updates);
 
     let result: i32 = valid_updates
         .iter()
