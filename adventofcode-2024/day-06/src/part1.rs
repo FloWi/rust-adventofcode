@@ -1,7 +1,7 @@
-use std::collections::{HashMap, HashSet};
-use std::ops::{Add, Neg};
 use glam::IVec2;
 use itertools::Itertools;
+use std::collections::{HashMap, HashSet};
+use std::ops::{Add, Neg};
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
@@ -18,8 +18,11 @@ pub fn process(input: &str) -> miette::Result<String> {
     Ok(result.to_string())
 }
 
-fn walk_off_the_earth(occupancy_map: &Vec<Vec<bool>>, location: &IVec2, direction: &IVec2) -> HashSet<IVec2> {
-
+fn walk_off_the_earth(
+    occupancy_map: &Vec<Vec<bool>>,
+    location: &IVec2,
+    direction: &IVec2,
+) -> HashSet<IVec2> {
     let height = occupancy_map.len() as i32;
     let width = occupancy_map[0].len() as i32;
 
@@ -30,7 +33,10 @@ fn walk_off_the_earth(occupancy_map: &Vec<Vec<bool>>, location: &IVec2, directio
         //FIXME: might need to rotate multiple times if you hit a dead-end
         println!("Exploring {:?} in direction {:?}", location, direction);
         let lookup_location = location.add(direction);
-        let is_occupied = occupancy_map.get(lookup_location.y as usize).and_then(|row| row.get(lookup_location.x as usize)).unwrap_or(&false);
+        let is_occupied = occupancy_map
+            .get(lookup_location.y as usize)
+            .and_then(|row| row.get(lookup_location.x as usize))
+            .unwrap_or(&false);
         if *is_occupied {
             direction = IVec2::new(-direction.y, direction.x); // rotate 90° CW if you hit an obstacle. Glam's positive y-axis points up, so we can't use their internal rotation stuff
             println!("Hit obstacle - new direction is {:?}", direction);
@@ -38,7 +44,7 @@ fn walk_off_the_earth(occupancy_map: &Vec<Vec<bool>>, location: &IVec2, directio
         location = location.add(direction);
         if location.y < 0 || location.y >= height || location.x < 0 || location.x >= width {
             println!("Fell off the earth at {:}", location);
-            return visited
+            return visited;
         }
         visited.insert(location);
     }
@@ -94,7 +100,7 @@ mod tests {
 #.........
 ......#...
         "#
-            .trim();
+        .trim();
         assert_eq!("41", process(input)?);
         Ok(())
     }

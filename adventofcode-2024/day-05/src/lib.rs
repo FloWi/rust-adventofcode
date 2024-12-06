@@ -31,31 +31,26 @@ fn find_first_rule_that_breaks_update(
     PageNumbersForUpdate(pages): &PageNumbersForUpdate,
     rules: &[PageOrderingRule],
 ) -> Option<UpdateBreaker> {
-    rules
-        .iter()
-        .find_map(|PageOrderingRule(first, second)| {
-            let maybe_first_idx = pages
-                .iter()
-                .find_position(|p| *p == first)
-                .map(|(idx, _)| idx);
-            let maybe_second_idx = pages
-                .iter()
-                .find_position(|p| *p == second)
-                .map(|(idx, _)| idx);
-            match maybe_first_idx.zip(maybe_second_idx) {
-                None => None,
-                Some((idx_1, idx_2)) => {
-                    if idx_1 > idx_2 {
-                        Some(UpdateBreaker {
-                            idx_1,
-                            idx_2,
-                        })
-                    } else {
-                        None
-                    }
+    rules.iter().find_map(|PageOrderingRule(first, second)| {
+        let maybe_first_idx = pages
+            .iter()
+            .find_position(|p| *p == first)
+            .map(|(idx, _)| idx);
+        let maybe_second_idx = pages
+            .iter()
+            .find_position(|p| *p == second)
+            .map(|(idx, _)| idx);
+        match maybe_first_idx.zip(maybe_second_idx) {
+            None => None,
+            Some((idx_1, idx_2)) => {
+                if idx_1 > idx_2 {
+                    Some(UpdateBreaker { idx_1, idx_2 })
+                } else {
+                    None
                 }
             }
-        })
+        }
+    })
 }
 
 #[derive(Debug, Clone)]
