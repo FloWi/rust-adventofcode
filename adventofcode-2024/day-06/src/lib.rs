@@ -52,7 +52,8 @@ where
     let mut visited: HashSet<IVec2> = HashSet::from([location]);
     let mut path: Vec<IVec2> = vec![location];
     loop {
-        let (new_location, new_direction) = perform_step(occupancy_map, &location, &direction, extra_obstacle);
+        let (new_location, new_direction) =
+            perform_step(occupancy_map, &location, &direction, extra_obstacle);
         location = new_location;
         direction = new_direction;
         if !in_bounds(location) {
@@ -62,13 +63,19 @@ where
             path.push(location);
         }
         visited.insert(location);
-
     }
 }
 
-fn perform_step(occupancy_map: &Vec<Vec<bool>>, location: &IVec2, direction: &IVec2, extra_obstacle: Option<IVec2>) -> (IVec2, IVec2) {
+fn perform_step(
+    occupancy_map: &Vec<Vec<bool>>,
+    location: &IVec2,
+    direction: &IVec2,
+    extra_obstacle: Option<IVec2>,
+) -> (IVec2, IVec2) {
     let lookup_location = location.add(direction);
-    let is_occupied_by_extra_obstacle = extra_obstacle.map(|ex| ex == lookup_location).unwrap_or(false);
+    let is_occupied_by_extra_obstacle = extra_obstacle
+        .map(|ex| ex == lookup_location)
+        .unwrap_or(false);
     let is_occupied_by_original_grid = occupancy_map
         .get(lookup_location.y as usize)
         .and_then(|row| row.get(lookup_location.x as usize))
@@ -90,5 +97,3 @@ fn perform_step(occupancy_map: &Vec<Vec<bool>>, location: &IVec2, direction: &IV
 
     (new_location, new_direction)
 }
-
-
