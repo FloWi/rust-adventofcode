@@ -41,31 +41,38 @@ fn walk_off_the_earth<F>(
     occupancy_map: &Vec<Vec<bool>>,
     location: &IVec2,
     direction: &IVec2,
+    extra_obstacle: Option<IVec2>,
     in_bounds: F,
-) -> HashSet<IVec2>
+) -> (HashSet<IVec2>, Vec<IVec2>)
 where
     F: Fn(IVec2) -> bool,
 {
     let mut location = *location;
     let mut direction = *direction;
     let mut visited: HashSet<IVec2> = HashSet::from([location]);
+    let mut path: Vec<IVec2> = vec![location];
     loop {
-        //FIXME: might need to rotate multiple times if you hit a dead-end
-        let (new_location, new_direction) = perform_step(occupancy_map, &location, &direction);
+        let (new_location, new_direction) = perform_step(occupancy_map, &location, &direction, extra_obstacle);
         location = new_location;
         direction = new_direction;
         if !in_bounds(location) {
-            return visited;
+            return (visited, path);
+        }
+        if !visited.contains(&location) {
+            path.push(location);
         }
         visited.insert(location);
+
     }
 }
 
-fn perform_step(occupancy_map: &Vec<Vec<bool>>, location: &IVec2, direction: &IVec2) -> (IVec2, IVec2) {
+fn perform_step(occupancy_map: &Vec<Vec<bool>>, location: &IVec2, direction: &IVec2, extra_obstacle: Option<IVec2>) -> (IVec2, IVec2) {
     let lookup_location = location.add(direction);
+    let maybe_hit_extra_obstacle = extra_obstacle.map(|ex| ex == lookup_location);
     let is_occupied = occupancy_map
         .get(lookup_location.y as usize)
         .and_then(|row| row.get(lookup_location.x as usize))
+        .or(maybe_hit_extra_obstacle.as_ref())
         .unwrap_or(&false);
     let new_direction = if *is_occupied {
         IVec2::new(-direction.y, direction.x) // rotate 90° CW if you hit an obstacle. Glam's positive y-axis points up, so we can't use their internal rotation stuff

@@ -14,7 +14,7 @@ pub fn process(input: &str) -> miette::Result<String> {
 
     let is_in_bounds = |loc: IVec2| loc.x >= 0 && loc.y >= 0 && loc.x < map_dimensions.x && loc.y < map_dimensions.y;
 
-    let visited = walk_off_the_earth(&occupancy_map, &location, &direction, is_in_bounds);
+    let (visited, _) = walk_off_the_earth(&occupancy_map, &location, &direction, None, is_in_bounds);
 
     let result = visited.len();
 
