@@ -1,7 +1,5 @@
 use crate::{parse_map, walk_off_the_earth};
 use glam::IVec2;
-use itertools::Itertools;
-use std::ops::{Add, Neg};
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {

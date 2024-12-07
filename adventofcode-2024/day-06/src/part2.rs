@@ -1,7 +1,6 @@
 use glam::IVec2;
 use itertools::Itertools;
 use std::collections::HashSet;
-use std::ops::{Add, Mul, Neg};
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {

@@ -18,10 +18,10 @@ fn parse_map(input: &str) -> (Vec<Vec<bool>>, IVec2, IVec2) {
     ]);
 
     for (y, line_str) in input.lines().enumerate() {
-        if &occupancy_map.len() <= &y {
-            &occupancy_map.push(Vec::new());
+        if occupancy_map.len() <= y {
+            occupancy_map.push(Vec::new());
         }
-        let mut line = &mut occupancy_map[y];
+        let line = &mut occupancy_map[y];
         for (x, map_char) in line_str.char_indices() {
             if map_char == '#' {
                 line.push(true)
