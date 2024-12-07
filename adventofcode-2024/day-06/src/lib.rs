@@ -68,19 +68,21 @@ where
 
 fn perform_step(occupancy_map: &Vec<Vec<bool>>, location: &IVec2, direction: &IVec2, extra_obstacle: Option<IVec2>) -> (IVec2, IVec2) {
     let lookup_location = location.add(direction);
-    let maybe_hit_extra_obstacle = extra_obstacle.map(|ex| ex == lookup_location);
-    let is_occupied = occupancy_map
+    let is_occupied_by_extra_obstacle = extra_obstacle.map(|ex| ex == lookup_location).unwrap_or(false);
+    let is_occupied_by_original_grid = occupancy_map
         .get(lookup_location.y as usize)
         .and_then(|row| row.get(lookup_location.x as usize))
-        .or(maybe_hit_extra_obstacle.as_ref())
         .unwrap_or(&false);
-    let new_direction = if *is_occupied {
+
+    let is_occupied = *is_occupied_by_original_grid || is_occupied_by_extra_obstacle;
+
+    let new_direction = if is_occupied {
         IVec2::new(-direction.y, direction.x) // rotate 90° CW if you hit an obstacle. Glam's positive y-axis points up, so we can't use their internal rotation stuff
     } else {
         *direction
     };
 
-    let new_location = if *is_occupied {
+    let new_location = if is_occupied {
         *location
     } else {
         location.add(direction)

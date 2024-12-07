@@ -23,12 +23,12 @@ pub fn process(input: &str) -> miette::Result<String> {
 
     let correct_obstacles = original_path.into_iter()
         .filter(|extra_obstacle| extra_obstacle != &starting_location)
-        .inspect(|potential_extra_obstacle| { dbg!(potential_extra_obstacle); })
+        //.inspect(|potential_extra_obstacle| { dbg!(potential_extra_obstacle); })
         .filter_map(|extra_obstacle| {
             let is_loop = find_loop(&occupancy_map, &starting_location, &direction, extra_obstacle, is_in_bounds);
             Some(extra_obstacle).filter(|_| is_loop)
         })
-        .inspect(|extra_obstacle| { dbg!(extra_obstacle); })
+        //.inspect(|extra_obstacle| { dbg!(extra_obstacle); })
         .collect_vec();
 
     let result = correct_obstacles.len();
@@ -37,26 +37,29 @@ pub fn process(input: &str) -> miette::Result<String> {
 
 
 fn find_loop<F>(occupancy_map: &Vec<Vec<bool>>,
-                location: &IVec2,
-                direction: &IVec2,
+                starting_location: &IVec2,
+                starting_direction: &IVec2,
                 extra_obstacle: IVec2,
                 in_bounds: F,
 ) -> bool
 where
     F: Fn(IVec2) -> bool,
 {
-    let mut location = *location;
-    let mut direction = *direction;
+    let mut location = *starting_location;
+    let mut direction = *starting_direction;
     let mut visited: HashSet<(IVec2, IVec2)> = HashSet::from([(location, direction)]);
     loop {
         //FIXME: might need to rotate multiple times if you hit a dead-end
         let (new_location, new_direction) = perform_step(occupancy_map, &location, &direction, Some(extra_obstacle));
         location = new_location;
         direction = new_direction;
-        if !in_bounds(location) {
+        let is_in_bounds = in_bounds(location);
+        let has_been_visited = visited.contains(&(location, direction));
+
+        if !is_in_bounds {
             return false;
         }
-        if visited.contains(&(location, direction)) {
+        if has_been_visited {
             return true;
         } else {
             visited.insert((location, direction));
