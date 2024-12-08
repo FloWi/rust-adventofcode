@@ -1,8 +1,8 @@
 use crate::{solve, MapDimensions};
 use glam::IVec2;
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
-use tracing::{debug, info};
+use std::collections::HashSet;
+use tracing::debug;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
