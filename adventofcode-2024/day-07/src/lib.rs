@@ -54,7 +54,7 @@ fn create_eval_list(
     calibration_equation: &CalibrationEquation,
     allowed_operators: &[Operator],
 ) -> (i64, Vec<Vec<(Operator, i64)>>) {
-    let first = calibration_equation.operands[0].clone();
+    let first = calibration_equation.operands[0];
 
     let rest = &calibration_equation.operands[1..];
 
