@@ -1,62 +1,40 @@
+use crate::Operator;
+use itertools::Itertools;
 use miette::miette;
-use nom::bytes::complete::tag;
-use nom::character::complete;
-use nom::character::complete::{char, line_ending};
-use nom::multi::separated_list1;
-use nom::sequence::separated_pair;
-use nom::IResult;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
-    let (_, calibration_equations) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
+    let (_, calibration_equations) =
+        crate::parse(input).map_err(|e| miette!("parse failed {}", e))?;
 
-    dbg!(calibration_equations);
-    unimplemented!()
+    let result = crate::calc_result(
+        calibration_equations,
+        vec![Operator::Add, Operator::Multiply],
+    );
+    Ok(result.to_string())
 }
 
-#[derive(Debug)]
-struct CalibrationEquation {
-    test_value: i64,
-    operands: Vec<i64>,
-}
+/*
+Example 1:
+190: 10 19
 
-fn calibration_equation_parser(input: &str) -> IResult<&str, CalibrationEquation> {
-    let (remaining, (test_value, operands)) = separated_pair(
-        complete::i64,
-        tag(": "),
-        separated_list1(char(' '), complete::i64),
-    )(input)?;
+10 + 19 = 19  // wrong
+10 * 19 = 190 // correct
 
-    Ok((
-        remaining,
-        CalibrationEquation {
-            test_value,
-            operands,
-        },
-    ))
-}
+Example 2:
+3267: 81 40 27
 
-fn parse(input: &str) -> IResult<&str, Vec<CalibrationEquation>> {
-    separated_list1(line_ending, calibration_equation_parser)(input)
-}
+81 + 40 + 27 = 121 + 27 = 148    // wrong
+81 + 40 * 27 = 121 * 27 = 3267   // correct
+81 * 40 + 27 = 3240 + 27 = 3267  // correct
+81 * 40 * 27 = 3240 * 27 = 87480 // wrong
 
-enum Operator {
-    Add,
-    Multiply,
-}
-
-impl Operator {
-    pub(crate) fn perform(&self, p0: i64, p1: i64) -> i64 {
-        match self {
-            Operator::Add => p0 + p1,
-            Operator::Multiply => p0 * p1,
-        }
-    }
-}
+ */
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::get_all_combinations;
 
     #[test]
     fn test_process() -> miette::Result<()> {
@@ -72,7 +50,24 @@ mod tests {
 292: 11 6 16 20
         "#
         .trim();
-        assert_eq!("", process(input)?);
+        assert_eq!("3749", process(input)?);
         Ok(())
+    }
+
+    #[test]
+    fn test_foo() {
+        let operands = vec![40, 27];
+        let operators = vec![Operator::Add, Operator::Multiply];
+
+        let expected_combinations = vec![
+            vec![(Operator::Add, 40), (Operator::Add, 27)],
+            vec![(Operator::Add, 40), (Operator::Multiply, 27)],
+            vec![(Operator::Multiply, 40), (Operator::Add, 27)],
+            vec![(Operator::Multiply, 40), (Operator::Multiply, 27)],
+        ];
+
+        let actual = get_all_combinations(operands, operators.as_slice());
+
+        assert_eq!(expected_combinations, actual);
     }
 }
