@@ -100,14 +100,14 @@ fn count_appearances(word: &str, input: &str) -> usize {
     let south_west_count = count_matches(&lines, &south_west);
     let north_west_count = count_matches(&lines, &north_west);
 
-    dbg!(east_count);
-    dbg!(west_count);
-    dbg!(south_count);
-    dbg!(north_count);
-    dbg!(north_east_count);
-    dbg!(south_east_count);
-    dbg!(south_west_count);
-    dbg!(north_west_count);
+    // dbg!(east_count);
+    // dbg!(west_count);
+    // dbg!(south_count);
+    // dbg!(north_count);
+    // dbg!(north_east_count);
+    // dbg!(south_east_count);
+    // dbg!(south_west_count);
+    // dbg!(north_west_count);
 
     east_count
         + west_count
