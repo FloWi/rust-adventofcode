@@ -14,10 +14,7 @@ pub fn process(input: &str) -> miette::Result<String> {
 
     let antinode_locations: HashSet<IVec2> = grouped_by_frequency
         .into_iter()
-        .map(|(frequency, locations)| {
-            
-            find_antinodes(&locations, map_dimensions)
-        })
+        .map(|(frequency, locations)| find_antinodes(&locations, map_dimensions))
         .fold(HashSet::new(), |mut acc, hash_set| {
             acc.extend(&hash_set);
             acc
@@ -83,7 +80,7 @@ fn find_antinodes(locations: &[IVec2], map_dimensions: MapDimensions) -> HashSet
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     use std::collections::HashSet;
 
     #[test]
