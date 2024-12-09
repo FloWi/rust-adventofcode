@@ -71,7 +71,7 @@ fn parse_disk_blocks(input: &str) -> Vec<Option<u16>> {
             let qty = match format!("{char}").parse::<i16>() {
                 Ok(x) => x,
                 Err(err) => {
-                    panic!("error parsing char '{char}': {}", err.to_string())
+                    panic!("error parsing char '{char}': {}", err)
                 }
             };
             repeat_n(id, qty as usize)
@@ -174,12 +174,11 @@ mod tests {
         .to_string();
 
         let compacting_states: Vec<String> = (0..=12)
-            .into_iter()
             .scan(disk_blocks, |current, idx| {
                 if idx > 0 {
                     compact_one_block(current);
                 }
-                Some(render_disk_blocks(&current))
+                Some(render_disk_blocks(current))
             })
             .collect_vec();
 
