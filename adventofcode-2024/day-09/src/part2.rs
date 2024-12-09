@@ -1,14 +1,14 @@
 use itertools::{repeat_n, Itertools};
+use tracing::debug;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
-    // let mut disk_blocks = parse_disk_blocks(input.trim());
-    // let compaction_result = compact_until_finished(&mut disk_blocks);
-    // assert!(compaction_result);
-    //
-    // let result = compute_checksum(&disk_blocks);
+    let mut disk_chunks = parse_disk_chunks(input.trim());
+    compact_until_finished(&mut disk_chunks);
 
-    Ok("TODO".to_string())
+    let result = compute_checksum(&disk_chunks);
+
+    Ok(result.to_string())
 }
 
 #[derive(PartialOrd, PartialEq)]
@@ -19,14 +19,44 @@ enum CompactionResult {
     NoOp,
 }
 
+fn compact_until_finished(disk_chunks: &mut Vec<Chunk>) {
+    let mut max_id = None;
+
+    loop {
+        let result = compact_one_chunk(disk_chunks, max_id);
+
+        match result {
+            CompactionResult::Error => {
+                panic!("Should not happen")
+            }
+            CompactionResult::Finished => {
+                break;
+            }
+            CompactionResult::OneStepDone { id } => {
+                if id > 0 {
+                    max_id = Some(id - 1)
+                } else {
+                    break;
+                }
+            }
+            CompactionResult::NoOp => {}
+        }
+    }
+}
+
 fn compact_one_chunk(disk_chunks: &mut Vec<Chunk>, max_id: Option<u16>) -> CompactionResult {
-    println!("compact_one_chunk start");
-    dbg!(&disk_chunks);
+    debug!("compact_one_chunk start");
+    debug!("{}", render_disk_chunks(&disk_chunks));
     if let Some(file_idx) = disk_chunks.iter().rposition(|chunk| match chunk {
         Chunk::File { id, .. } if *id <= max_id.unwrap_or(u16::MAX) => true,
         _ => false,
     }) {
-        println!(
+        let file_id = match disk_chunks[file_idx] {
+            Chunk::File { id, .. } => id,
+            Chunk::Empty { .. } => panic!("Should find file_id"),
+        };
+
+        debug!(
             "last valid file is at position: {file_idx}: {:?}",
             disk_chunks[file_idx]
         );
@@ -40,10 +70,10 @@ fn compact_one_chunk(disk_chunks: &mut Vec<Chunk>, max_id: Option<u16>) -> Compa
             _ => false,
         }) {
             if empty_idx > file_idx {
-                println!("empty_idx {empty_idx} is not < file_idx {file_idx}");
-                CompactionResult::NoOp
+                debug!("empty_idx {empty_idx} is not < file_idx {file_idx}");
+                CompactionResult::OneStepDone { id: file_id }
             } else {
-                println!(
+                debug!(
                     "first matching empty block at position: {empty_idx}: {:?}",
                     disk_chunks[empty_idx]
                 );
@@ -58,7 +88,7 @@ fn compact_one_chunk(disk_chunks: &mut Vec<Chunk>, max_id: Option<u16>) -> Compa
                         },
                     ) => {
                         let empty_space_merge_candidate_idx = if file_length == empty_length {
-                            println!("swapped equally sized (length {file_length} empty chunk with file chunk");
+                            debug!("swapped equally sized (length {file_length} empty chunk with file chunk");
                             disk_chunks.swap(empty_idx, file_idx);
                             empty_idx
                         } else {
@@ -72,9 +102,9 @@ fn compact_one_chunk(disk_chunks: &mut Vec<Chunk>, max_id: Option<u16>) -> Compa
                                 },
                             );
                             // now the empty space (that has moved to the back) is too large. It needs to be trimmed to file_length.
-                            println!("swapped file (length {file_length} with empty chunk (length {empty_length}) file chunk and inserted new empty chunk of length {leftover_length} after the file");
+                            debug!("swapped file (length {file_length} with empty chunk (length {empty_length}) file chunk and inserted new empty chunk of length {leftover_length} after the file");
                             disk_chunks[file_idx + 1].set_length(file_length);
-                            println!("set length of empty space at the end to {file_length}");
+                            debug!("set length of empty space at the end to {file_length}");
                             file_idx + 1
                         };
                         merge_empty_space(disk_chunks, empty_space_merge_candidate_idx);
@@ -84,18 +114,22 @@ fn compact_one_chunk(disk_chunks: &mut Vec<Chunk>, max_id: Option<u16>) -> Compa
                 }
             }
         } else {
-            println!("no matching file found where id <= max_id({max_id:?})");
-            CompactionResult::NoOp
+            debug!("no empty slot of length {required_length} found");
+            //TODO: Find better way to extract id here that avoids the pattern match - ideally something like r_find_some
+            match disk_chunks[file_idx] {
+                Chunk::File { id, .. } => CompactionResult::OneStepDone { id },
+                Chunk::Empty { .. } => CompactionResult::Error,
+            }
         }
     } else {
-        println!("no matching empty chunk found");
+        debug!("no file left to process");
         CompactionResult::Finished
     }
 }
 
 fn merge_empty_space(disk_chunks: &mut Vec<Chunk>, empty_space_merge_candidate_idx: usize) {
-    println!("checking if empty space at idx {empty_space_merge_candidate_idx} can be merged with surrounding empty space");
-    dbg!(&disk_chunks);
+    debug!("checking if empty space at idx {empty_space_merge_candidate_idx} can be merged with surrounding empty space");
+    debug!("{}", render_disk_chunks(&disk_chunks));
     match (
         disk_chunks.get(empty_space_merge_candidate_idx - 1),
         disk_chunks.get(empty_space_merge_candidate_idx),
@@ -107,7 +141,7 @@ fn merge_empty_space(disk_chunks: &mut Vec<Chunk>, empty_space_merge_candidate_i
             Some(Chunk::Empty { length: length_3 }),
         ) => {
             let total_length = length_1 + length_2 + length_3;
-            println!("found 3 empty chunks of lengths ({length_1}, {length_2}, {length_3}) that can be merged to one chunk of length {total_length}");
+            debug!("found 3 empty chunks of lengths ({length_1}, {length_2}, {length_3}) that can be merged to one chunk of length {total_length}");
             disk_chunks[empty_space_merge_candidate_idx - 1] = Chunk::Empty {
                 length: total_length,
             };
@@ -116,7 +150,7 @@ fn merge_empty_space(disk_chunks: &mut Vec<Chunk>, empty_space_merge_candidate_i
         }
         (Some(Chunk::Empty { length: length_1 }), Some(Chunk::Empty { length: length_2 }), _) => {
             let total_length = length_1 + length_2;
-            println!("found 2 empty chunks of lengths ({length_1}, {length_2}) that can be merged to one chunk of length {total_length}");
+            debug!("found 2 empty chunks of lengths ({length_1}, {length_2}) that can be merged to one chunk of length {total_length}");
             disk_chunks[empty_space_merge_candidate_idx - 1] = Chunk::Empty {
                 length: total_length,
             };
@@ -124,26 +158,32 @@ fn merge_empty_space(disk_chunks: &mut Vec<Chunk>, empty_space_merge_candidate_i
         }
         (_, Some(Chunk::Empty { length: length_1 }), Some(Chunk::Empty { length: length_2 })) => {
             let total_length = length_1 + length_2;
-            println!("found 2 empty chunks of lengths ({length_1}, {length_2}) that can be merged to one chunk of length {total_length}");
+            debug!("found 2 empty chunks of lengths ({length_1}, {length_2}) that can be merged to one chunk of length {total_length}");
             disk_chunks[empty_space_merge_candidate_idx] = Chunk::Empty {
                 length: total_length,
             };
             disk_chunks.remove(empty_space_merge_candidate_idx + 1);
         }
         surroundings => {
-            println!("no consecutive empty chunks found {surroundings:?}");
+            debug!("no consecutive empty chunks found {surroundings:?}");
         }
     };
-    dbg!(disk_chunks);
+    debug!("{}", render_disk_chunks(&disk_chunks));
 }
 
-fn compute_checksum(disk_blocks: &Vec<Option<u16>>) -> usize {
+fn compute_checksum(disk_blocks: &[Chunk]) -> usize {
     disk_blocks
         .iter()
-        .enumerate()
-        .fold(0usize, |acc, (idx, block_id)| {
-            acc + idx * block_id.unwrap_or(0) as usize
+        .fold((0usize, 0u32), |(acc, idx), (chunk)| match chunk {
+            Chunk::File { id, length } => {
+                let checksum_of_this_file: u32 = (idx..(idx + *length as u32))
+                    .map(|idx| idx * *id as u32)
+                    .sum();
+                (acc + checksum_of_this_file as usize, idx + *length as u32)
+            }
+            Chunk::Empty { length } => (acc, idx + *length as u32),
         })
+        .0
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -298,17 +338,14 @@ mod tests {
         "#
         .trim();
 
-        unimplemented!();
-        //
-        // let mut disk_blocks = parse_disk_blocks(input);
-        // let result = compact_until_finished(&mut disk_blocks);
-        // assert!(result);
-        //
-        // assert_eq!(
-        //     "00992111777.44.333....5555.6666.....8888..",
-        //     render_disk_blocks(&disk_blocks)
-        // );
-        // assert_eq!(2858usize, compute_checksum(&disk_blocks));
+        let mut disk_chunks = parse_disk_chunks(input);
+        let result = compact_until_finished(&mut disk_chunks);
+
+        assert_eq!(
+            "00992111777.44.333....5555.6666.....8888..",
+            render_disk_chunks(&disk_chunks)
+        );
+        //assert_eq!(2858usize, compute_checksum(&disk_chunks));
         Ok(())
 
         // example 1
