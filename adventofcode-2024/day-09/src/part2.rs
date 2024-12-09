@@ -46,7 +46,7 @@ fn compact_until_finished(disk_chunks: &mut Vec<Chunk>) {
 
 fn compact_one_chunk(disk_chunks: &mut Vec<Chunk>, max_id: Option<u16>) -> CompactionResult {
     debug!("compact_one_chunk start");
-    debug!("{}", render_disk_chunks(&disk_chunks));
+    debug!("{}", render_disk_chunks(disk_chunks));
     if let Some(file_idx) = disk_chunks.iter().rposition(|chunk| match chunk {
         Chunk::File { id, .. } if *id <= max_id.unwrap_or(u16::MAX) => true,
         _ => false,
@@ -129,7 +129,7 @@ fn compact_one_chunk(disk_chunks: &mut Vec<Chunk>, max_id: Option<u16>) -> Compa
 
 fn merge_empty_space(disk_chunks: &mut Vec<Chunk>, empty_space_merge_candidate_idx: usize) {
     debug!("checking if empty space at idx {empty_space_merge_candidate_idx} can be merged with surrounding empty space");
-    debug!("{}", render_disk_chunks(&disk_chunks));
+    debug!("{}", render_disk_chunks(disk_chunks));
     match (
         disk_chunks.get(empty_space_merge_candidate_idx - 1),
         disk_chunks.get(empty_space_merge_candidate_idx),
@@ -168,13 +168,13 @@ fn merge_empty_space(disk_chunks: &mut Vec<Chunk>, empty_space_merge_candidate_i
             debug!("no consecutive empty chunks found {surroundings:?}");
         }
     };
-    debug!("{}", render_disk_chunks(&disk_chunks));
+    debug!("{}", render_disk_chunks(disk_chunks));
 }
 
 fn compute_checksum(disk_blocks: &[Chunk]) -> usize {
     disk_blocks
         .iter()
-        .fold((0usize, 0u32), |(acc, idx), (chunk)| match chunk {
+        .fold((0usize, 0u32), |(acc, idx), chunk| match chunk {
             Chunk::File { id, length } => {
                 let checksum_of_this_file: u32 = (idx..(idx + *length as u32))
                     .map(|idx| idx * *id as u32)
@@ -339,7 +339,7 @@ mod tests {
         .trim();
 
         let mut disk_chunks = parse_disk_chunks(input);
-        let result = compact_until_finished(&mut disk_chunks);
+        compact_until_finished(&mut disk_chunks);
 
         assert_eq!(
             "00992111777.44.333....5555.6666.....8888..",
