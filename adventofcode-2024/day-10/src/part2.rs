@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use miette::miette;
 use pathfinding::prelude::*;
-use tracing::debug;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
