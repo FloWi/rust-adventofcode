@@ -71,47 +71,46 @@ fn compact_one_chunk(disk_chunks: &mut Vec<Chunk>, max_id: Option<u16>) -> Compa
         }) {
             if empty_idx > file_idx {
                 debug!("empty_idx {empty_idx} is not < file_idx {file_idx}");
-                CompactionResult::OneStepDone { id: file_id }
-            } else {
-                debug!(
-                    "first matching empty block at position: {empty_idx}: {:?}",
-                    disk_chunks[empty_idx]
-                );
-                match (disk_chunks[file_idx], disk_chunks[empty_idx]) {
-                    (
-                        Chunk::File {
-                            id,
-                            length: file_length,
-                        },
-                        Chunk::Empty {
-                            length: empty_length,
-                        },
-                    ) => {
-                        let empty_space_merge_candidate_idx = if file_length == empty_length {
-                            debug!("swapped equally sized (length {file_length} empty chunk with file chunk");
-                            disk_chunks.swap(empty_idx, file_idx);
-                            empty_idx
-                        } else {
-                            disk_chunks.swap(empty_idx, file_idx);
-                            // the file was smaller than the empty space - insert a new empty space chunk after the file
-                            let leftover_length = empty_length - file_length;
-                            disk_chunks.insert(
-                                empty_idx + 1,
-                                Chunk::Empty {
-                                    length: leftover_length,
-                                },
-                            );
-                            // now the empty space (that has moved to the back) is too large. It needs to be trimmed to file_length.
-                            debug!("swapped file (length {file_length} with empty chunk (length {empty_length}) file chunk and inserted new empty chunk of length {leftover_length} after the file");
-                            disk_chunks[file_idx + 1].set_length(file_length);
-                            debug!("set length of empty space at the end to {file_length}");
-                            file_idx + 1
-                        };
-                        merge_empty_space(disk_chunks, empty_space_merge_candidate_idx);
-                        CompactionResult::OneStepDone { id }
-                    }
-                    _ => panic!("should not happen"),
+                return CompactionResult::OneStepDone { id: file_id };
+            }
+            debug!(
+                "first matching empty block at position: {empty_idx}: {:?}",
+                disk_chunks[empty_idx]
+            );
+            match (disk_chunks[file_idx], disk_chunks[empty_idx]) {
+                (
+                    Chunk::File {
+                        id,
+                        length: file_length,
+                    },
+                    Chunk::Empty {
+                        length: empty_length,
+                    },
+                ) => {
+                    let empty_space_merge_candidate_idx = if file_length == empty_length {
+                        debug!("swapped equally sized (length {file_length} empty chunk with file chunk");
+                        disk_chunks.swap(empty_idx, file_idx);
+                        empty_idx
+                    } else {
+                        disk_chunks.swap(empty_idx, file_idx);
+                        // the file was smaller than the empty space - insert a new empty space chunk after the file
+                        let leftover_length = empty_length - file_length;
+                        disk_chunks.insert(
+                            empty_idx + 1,
+                            Chunk::Empty {
+                                length: leftover_length,
+                            },
+                        );
+                        // now the empty space (that has moved to the back) is too large. It needs to be trimmed to file_length.
+                        debug!("swapped file (length {file_length} with empty chunk (length {empty_length}) file chunk and inserted new empty chunk of length {leftover_length} after the file");
+                        disk_chunks[file_idx + 1].set_length(file_length);
+                        debug!("set length of empty space at the end to {file_length}");
+                        file_idx + 1
+                    };
+                    merge_empty_space(disk_chunks, empty_space_merge_candidate_idx);
+                    CompactionResult::OneStepDone { id }
                 }
+                _ => panic!("should not happen"),
             }
         } else {
             debug!("no empty slot of length {required_length} found");
