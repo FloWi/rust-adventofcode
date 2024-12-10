@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use miette::miette;
 use pathfinding::prelude::*;
-use std::collections::HashMap;
 use tracing::debug;
 
 #[tracing::instrument]
