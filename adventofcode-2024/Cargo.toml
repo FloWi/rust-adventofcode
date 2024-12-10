@@ -23,3 +23,4 @@ test-log = { version = "0.2.13", default-features = false, features = [
     "trace",
 ] }
 thiserror = "2.0.3"
+pathfinding = "4.11.0"
