@@ -91,10 +91,7 @@ mod tests {
             })
             .collect_vec();
 
-        let actual_str = actual
-            .iter()
-            .map(|line| line.iter().join(" "))
-            .join("\n");
+        let actual_str = actual.iter().map(|line| line.iter().join(" ")).join("\n");
         let expected = r#"
 253000 1 7
 253 0 2024 14168
