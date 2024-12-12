@@ -96,9 +96,11 @@ fn find_areas(tiles: HashMap<IVec2, char>) -> HashMap<char, Vec<HashSet<IVec2>>>
                 .filter(|neighbor| locations.contains(neighbor))
                 .collect();
             let matching_areas = areas
-                .iter().filter(|&area| {
+                .iter()
+                .filter(|&area| {
                     area.contains(loc) || area.iter().any(|node| neighbors.contains(node))
-                }).cloned()
+                })
+                .cloned()
                 .collect_vec();
 
             println!("Evaluating loc {loc}. Found {} neighbor(s). Loc and or neighbors are contained in {} area(s)", neighbors.len(), matching_areas.len());

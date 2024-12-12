@@ -122,7 +122,7 @@ fn combine_edges_into_adjacent_edge_groups(
         .into_iter()
         .collect_vec();
 
-    for (x, candidates) in vertical_edge_groups_by_x.iter().cloned() {
+    for (x, candidates) in vertical_edge_groups_by_x.iter() {
         let consecutive_edges: Vec<Vec<IVec2>> = create_adjacent_groups_of_sorted_candidates(
             &candidates
                 .iter()
@@ -145,7 +145,7 @@ fn combine_edges_into_adjacent_edge_groups(
         }
     }
 
-    for (y, candidates) in horizontal_edge_groups_by_y.iter().cloned() {
+    for (y, candidates) in horizontal_edge_groups_by_y.iter() {
         let consecutive_edges: Vec<Vec<IVec2>> = create_adjacent_groups_of_sorted_candidates(
             &candidates
                 .iter()
@@ -349,7 +349,6 @@ mod tests {
     use super::*;
     use glam::IVec2;
     use std::collections::{HashMap, HashSet};
-    use std::ops::Deref;
 
     #[test]
     fn test_process_example_1() -> miette::Result<()> {
