@@ -9,19 +9,19 @@ pub fn process(input: &str) -> miette::Result<String> {
     let all_areas: HashMap<char, Vec<HashSet<IVec2>>> = find_areas(parsed_tiles.clone());
 
     let scores = score_areas(&all_areas, parsed_tiles.clone());
-    let scored_with_edges: Vec<(ScoredArea, usize)> = add_edge_score_to_areas(&scores);
+    let updated_scores: Vec<ScoredArea> = add_edge_score_to_areas(&scores);
 
-    dbg!(&scored_with_edges);
+    dbg!(&updated_scores);
 
-    let result: usize = scored_with_edges
+    let result: usize = updated_scores
         .iter()
-        .map(|(scored_area, num_sides)| scored_area.size * num_sides)
+        .map(|scored_area| scored_area.score)
         .sum();
 
     Ok(result.to_string())
 }
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 enum EdgeDir {
     North,
     East,
@@ -36,43 +36,37 @@ const EDGE_OFFSETS: [(EdgeDir, IVec2); 4] = [
     (EdgeDir::West, IVec2::NEG_X),
 ];
 
-fn add_edge_score_to_areas(scored_areas: &Vec<ScoredArea>) -> Vec<(ScoredArea, usize)> {
+fn add_edge_score_to_areas(scored_areas: &Vec<ScoredArea>) -> Vec<ScoredArea> {
     scored_areas
         .clone()
         .into_iter()
         .map(|scored_area| {
-            let edges = scored_area
+            let outer_edges = scored_area
                 .area
                 .iter()
                 .flat_map(|loc| {
-                    EDGE_OFFSETS.iter().map(move |(dir, offset)| {
-                        // these edges are identical
-                        // 0,0 SOUTH
-                        // 0,1 NORTH
-                        // so we normalize these edges
-                        // SOUTH edge of x == NORTH edge of SOUTH_NEIGHBOR
-                        // WEST edge of x == EAST edge of WEST_NEIGHBOR
-                        let (normalized_direction, location) = match dir {
-                            EdgeDir::North => (dir, *loc),
-                            EdgeDir::East => (dir, *loc),
-                            EdgeDir::South => (&EdgeDir::North, loc + offset),
-                            EdgeDir::West => (&EdgeDir::East, loc + offset),
-                        };
-                        (location, normalized_direction)
+                    EDGE_OFFSETS.into_iter().filter_map({
+                        // very ugly, but borrow-checker was more stubborn than me
+                        let area = scored_area.area.clone();
+                        move |(dir, offset)| {
+                            // we can add an outside edge if the neighbor in that direction is non-existent
+                            let neighbor_location = loc + offset;
+                            if area.contains(&neighbor_location) {
+                                // inner edge - don't add
+                                None
+                            } else {
+                                // outer edge
+                                Some((*loc, dir))
+                            }
+                        }
                     })
                 })
                 .collect_vec();
 
-            let outer_edges = edges
-                .into_iter()
-                .counts()
-                .into_iter()
-                .filter(|(edge, count)| *count < 2)
-                .collect_vec();
             let edges_string = outer_edges
                 .clone()
                 .into_iter()
-                .map(|((loc, edge_dir), count)| {
+                .map(|(loc, edge_dir)| {
                     let direction_label = match edge_dir {
                         EdgeDir::North => "N".to_string(),
                         EdgeDir::East => "E".to_string(),
@@ -85,126 +79,129 @@ fn add_edge_score_to_areas(scored_areas: &Vec<ScoredArea>) -> Vec<(ScoredArea, u
 
             //let edges
 
-            println!("outer edges for '{}': {edges_string}", scored_area.label);
+            let better_edge_groups: Vec<Vec<(IVec2, EdgeDir)>> =
+                better_combine_edges_into_adjacent_edge_groups(&outer_edges, &scored_area);
 
-            let edge_groups: Vec<Vec<IVec2>> =
-                combine_edges_into_adjacent_edge_groups(&outer_edges, &scored_area);
+            let perimeter = better_edge_groups.len();
+            let score = scored_area.size * perimeter;
 
-            (scored_area, edge_groups.len())
+            ScoredArea {
+                merged_edges: better_edge_groups.clone(),
+                perimeter,
+                score,
+                ..scored_area
+            }
         })
         .collect_vec()
 }
 
-fn combine_edges_into_adjacent_edge_groups(
-    outer_edges: &Vec<((IVec2, &EdgeDir), usize)>,
+fn better_combine_edges_into_adjacent_edge_groups(
+    outer_edges: &Vec<(IVec2, EdgeDir)>,
     scored_area: &ScoredArea,
-) -> Vec<Vec<IVec2>> {
-    println!(
-        "\n\ncombine_edges_into_adjacent_edge_groups for '{}'",
-        scored_area.label
-    );
+) -> Vec<Vec<(IVec2, EdgeDir)>> {
+    /*
+    outer edges for 'A': [2, 0]N, [2, 0]S, [1, 0]N, [1, 0]S, [0, 0]N, [0, 0]S, [0, 0]W, [3, 0]N, [3, 0]E, [3, 0]S
 
-    let mut result = Vec::new();
+    E x=3 [3, 0]
+    W x=0 [0, 0]
+    N y=0 [0, 0]
+    N y=0 [1, 0]
+    N y=0 [2, 0]
+    N y=0 [3, 0]
+    S y=0 [0, 0]
+    S y=0 [1, 0]
+    S y=0 [2, 0]
+    S y=0 [3, 0]
+         */
 
-    let horizontal_edge_groups_by_y = outer_edges
+    let horizontal_edge_group_candidates = outer_edges
         .iter()
-        .filter(|((loc, edge_dir), count)| **edge_dir == EdgeDir::North)
-        .map(|((loc, edge_dir), count)| (loc, edge_dir))
-        .into_group_map_by(|(loc, _)| loc.y)
+        .filter(|(_, dir)| match dir {
+            EdgeDir::North | EdgeDir::South => true,
+            EdgeDir::East | EdgeDir::West => false,
+        })
+        .into_group_map_by(|(loc, dir)| (loc.y, dir));
+
+    let vertical_edge_group_candidates = outer_edges
+        .iter()
+        .filter(|(_, dir)| match dir {
+            EdgeDir::East | EdgeDir::West => true,
+            EdgeDir::North | EdgeDir::South => false,
+        })
+        .into_group_map_by(|(loc, dir)| (loc.x, dir));
+
+    let horizontal_edge_groups = horizontal_edge_group_candidates
         .into_iter()
+        .flat_map(|((y, dir), candidates)| {
+            let xs = candidates
+                .iter()
+                .map(|(loc, _)| loc.x)
+                .sorted()
+                .collect_vec();
+            let consecutive_ranges = find_consecutive_ranges(&xs);
+
+            consecutive_ranges
+                .iter()
+                .map(|range| {
+                    range
+                        .iter()
+                        .map(|x| (IVec2::new(*x, y), dir.clone()))
+                        .collect_vec()
+                })
+                .collect_vec()
+        })
         .collect_vec();
 
-    let vertical_edge_groups_by_x = outer_edges
-        .iter()
-        .filter(|((loc, edge_dir), count)| **edge_dir == EdgeDir::East)
-        .map(|((loc, edge_dir), count)| (loc, edge_dir))
-        .into_group_map_by(|(loc, _)| loc.x)
+    let vertical_edge_groups = vertical_edge_group_candidates
         .into_iter()
+        .flat_map(|((x, dir), candidates)| {
+            let ys = candidates
+                .iter()
+                .map(|(loc, _)| loc.y)
+                .sorted()
+                .collect_vec();
+            let consecutive_ranges = find_consecutive_ranges(&ys);
+
+            consecutive_ranges
+                .iter()
+                .map(|range| {
+                    range
+                        .iter()
+                        .map(|y| (IVec2::new(x, *y), dir.clone()))
+                        .collect_vec()
+                })
+                .collect_vec()
+        })
         .collect_vec();
 
-    for (x, candidates) in vertical_edge_groups_by_x.iter() {
-        let consecutive_edges: Vec<Vec<IVec2>> = create_adjacent_groups_of_sorted_candidates(
-            &candidates
-                .iter()
-                .map(|(loc, _)| **loc)
-                .sorted_by_key(|loc| loc.y)
-                .collect_vec(),
-        );
+    dbg!(&horizontal_edge_groups);
+    dbg!(&vertical_edge_groups);
 
-        println!(
-            "found {} vertical edges for x = {x}\nedges: {}",
-            consecutive_edges.len(),
-            consecutive_edges
-                .iter()
-                .cloned()
-                .map(|edge_group| edge_group.iter().join(", "))
-                .join("\n")
-        );
-        for edge_group in consecutive_edges {
-            result.push(edge_group)
-        }
-    }
-
-    for (y, candidates) in horizontal_edge_groups_by_y.iter() {
-        let consecutive_edges: Vec<Vec<IVec2>> = create_adjacent_groups_of_sorted_candidates(
-            &candidates
-                .iter()
-                .map(|(loc, _)| **loc)
-                .sorted_by_key(|loc| loc.x)
-                .collect_vec(),
-        );
-
-        println!(
-            "found {} horizontal edges for y = {y}\nedges: {}\n\n",
-            consecutive_edges.len(),
-            consecutive_edges
-                .iter()
-                .cloned()
-                .map(|edge_group| edge_group.iter().join(", "))
-                .join("\n")
-        );
-        for edge_group in consecutive_edges {
-            result.push(edge_group)
-        }
-    }
-
-    result
+    [&horizontal_edge_groups[..], &vertical_edge_groups[..]].concat()
 }
 
-fn create_adjacent_groups_of_sorted_candidates(nodes: &[IVec2]) -> Vec<Vec<IVec2>> {
-    let mut result = Vec::new();
-
-    let mut open_list = nodes.iter().cloned().collect_vec();
-
-    loop {
-        dbg!(&open_list);
-        if let Some(start) = open_list.first() {
-            let neighbors_with_distance_to_start: Vec<(IVec2, i32)> = open_list
-                .iter()
-                .map(|n| {
-                    let diff = n - start;
-                    let distance = diff.x.abs() + diff.y.abs();
-                    (*n, distance)
-                })
-                .enumerate()
-                //.inspect(|x| println!("(idx, (n, distance)): {x:?}"))
-                .take_while(|(idx, (n, distance))| *idx as i32 == *distance)
-                .map(|(idx, (n, distance))| (n, distance))
-                .collect_vec();
-
-            //dbg!(&neighbors_with_distance_to_start);
-
-            let group = neighbors_with_distance_to_start
-                .into_iter()
-                .map(|tup| tup.0)
-                .collect_vec();
-
-            result.push(group.clone());
-            open_list = open_list.into_iter().skip(group.len()).collect_vec();
-        } else {
-            return result;
-        }
+// Alternative approach using windows to make the logic more explicit
+fn find_consecutive_ranges(numbers: &[i32]) -> Vec<Vec<i32>> {
+    if numbers.is_empty() {
+        return vec![];
     }
+
+    let splits = numbers
+        .windows(2)
+        .enumerate()
+        // Find positions where the difference isn't 1
+        .filter(|(_, w)| w[1] - w[0] != 1)
+        .map(|(i, _)| i + 1)
+        .collect::<Vec<_>>();
+
+    // Use the split positions to create our ranges
+    std::iter::once(0)
+        .chain(splits)
+        .chain(std::iter::once(numbers.len()))
+        .collect::<Vec<_>>()
+        .windows(2)
+        .map(|w| numbers[w[0]..w[1]].to_vec())
+        .collect()
 }
 
 #[derive(Debug, Clone)]
@@ -214,6 +211,7 @@ struct ScoredArea {
     size: usize,
     perimeter: usize,
     score: usize,
+    merged_edges: Vec<Vec<(IVec2, EdgeDir)>>,
 }
 
 fn score_areas(
@@ -254,6 +252,8 @@ fn score_areas(
                 size: area.len(),
                 perimeter: perimeter_length,
                 score: area.len() * perimeter_length,
+
+                merged_edges: vec![],
             });
         }
     }
@@ -436,11 +436,13 @@ AAAA
             .collect();
 
         let scores = score_areas(&all_areas, parsed_tiles.clone());
-        let scored_with_edges: Vec<(ScoredArea, usize)> = add_edge_score_to_areas(&scores);
+        let scored_with_edges: Vec<ScoredArea> = add_edge_score_to_areas(&scores);
 
         dbg!(scores);
 
         assert_eq!(parsed_tiles, tiles_from_areas);
+
+        assert_eq!(process(input)?, "16");
 
         Ok(())
     }
@@ -471,7 +473,7 @@ CCAAA
             .collect();
 
         let scores = score_areas(&all_areas, parsed_tiles.clone());
-        let scored_with_edges: Vec<(ScoredArea, usize)> = add_edge_score_to_areas(&scores);
+        let scored_with_edges: Vec<ScoredArea> = add_edge_score_to_areas(&scores);
 
         dbg!(scores);
 
