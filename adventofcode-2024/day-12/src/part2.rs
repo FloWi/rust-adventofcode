@@ -1,17 +1,18 @@
 use glam::IVec2;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
+use tracing::debug;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
     let parsed_tiles: HashMap<IVec2, char> = parse(input);
-    dbg!(&parsed_tiles);
+    //dbg!(&parsed_tiles);
     let all_areas: HashMap<char, Vec<HashSet<IVec2>>> = find_areas(parsed_tiles.clone());
 
     let scores = score_areas(&all_areas, parsed_tiles.clone());
     let updated_scores: Vec<ScoredArea> = add_edge_score_to_areas(&scores);
 
-    dbg!(&updated_scores);
+    //dbg!(&updated_scores);
 
     let result: usize = updated_scores
         .iter()
@@ -63,24 +64,8 @@ fn add_edge_score_to_areas(scored_areas: &Vec<ScoredArea>) -> Vec<ScoredArea> {
                 })
                 .collect_vec();
 
-            let edges_string = outer_edges
-                .clone()
-                .into_iter()
-                .map(|(loc, edge_dir)| {
-                    let direction_label = match edge_dir {
-                        EdgeDir::North => "N".to_string(),
-                        EdgeDir::East => "E".to_string(),
-                        EdgeDir::South => "S".to_string(),
-                        EdgeDir::West => "W".to_string(),
-                    };
-                    format!("{loc}{direction_label}")
-                })
-                .join(", ");
-
-            //let edges
-
             let better_edge_groups: Vec<Vec<(IVec2, EdgeDir)>> =
-                better_combine_edges_into_adjacent_edge_groups(&outer_edges, &scored_area);
+                better_combine_edges_into_adjacent_edge_groups(&outer_edges);
 
             let perimeter = better_edge_groups.len();
             let score = scored_area.size * perimeter;
@@ -97,7 +82,6 @@ fn add_edge_score_to_areas(scored_areas: &Vec<ScoredArea>) -> Vec<ScoredArea> {
 
 fn better_combine_edges_into_adjacent_edge_groups(
     outer_edges: &Vec<(IVec2, EdgeDir)>,
-    scored_area: &ScoredArea,
 ) -> Vec<Vec<(IVec2, EdgeDir)>> {
     /*
     outer edges for 'A': [2, 0]N, [2, 0]S, [1, 0]N, [1, 0]S, [0, 0]N, [0, 0]S, [0, 0]W, [3, 0]N, [3, 0]E, [3, 0]S
@@ -173,9 +157,6 @@ fn better_combine_edges_into_adjacent_edge_groups(
                 .collect_vec()
         })
         .collect_vec();
-
-    dbg!(&horizontal_edge_groups);
-    dbg!(&vertical_edge_groups);
 
     [&horizontal_edge_groups[..], &vertical_edge_groups[..]].concat()
 }
@@ -273,7 +254,7 @@ fn find_areas(tiles: HashMap<IVec2, char>) -> HashMap<char, Vec<HashSet<IVec2>>>
     let mut result = HashMap::new();
 
     for (char, locations) in char_locations {
-        println!(
+        debug!(
             "\n\nfind_areas: processing '{char}' with {} locations",
             locations.len()
         );
@@ -293,7 +274,7 @@ fn find_areas(tiles: HashMap<IVec2, char>) -> HashMap<char, Vec<HashSet<IVec2>>>
                 .cloned()
                 .collect_vec();
 
-            println!("Evaluating loc {loc}. Found {} neighbor(s). Loc and or neighbors are contained in {} area(s)", neighbors.len(), matching_areas.len());
+            debug!("Evaluating loc {loc}. Found {} neighbor(s). Loc and or neighbors are contained in {} area(s)", neighbors.len(), matching_areas.len());
 
             if matching_areas.is_empty() {
                 let mut new_area = HashSet::new();
@@ -301,7 +282,7 @@ fn find_areas(tiles: HashMap<IVec2, char>) -> HashMap<char, Vec<HashSet<IVec2>>>
                 for neighbor in neighbors.iter() {
                     new_area.insert(*neighbor);
                 }
-                println!("No matching area found. Creating new one with location and all relevant neighbors: {new_area:?}");
+                debug!("No matching area found. Creating new one with location and all relevant neighbors: {new_area:?}");
                 areas.push(new_area);
             } else {
                 // we can now merge the areas together, since we found connecting tile(s) between all of them.
@@ -309,7 +290,7 @@ fn find_areas(tiles: HashMap<IVec2, char>) -> HashMap<char, Vec<HashSet<IVec2>>>
                     acc.union(&curr.clone()).cloned().collect()
                 });
 
-                println!("Inserting loc and neighbors into all matching areas");
+                debug!("Inserting loc and neighbors into all matching areas");
                 new_area.insert(*loc);
                 for neighbor in &neighbors {
                     new_area.insert(*neighbor);
@@ -318,7 +299,7 @@ fn find_areas(tiles: HashMap<IVec2, char>) -> HashMap<char, Vec<HashSet<IVec2>>>
                     if let Some(idx) = areas.iter().position(|area| area == &matching_area) {
                         areas.remove(idx);
                     } else {
-                        println!("Tried to remove matching_area, but couldn't find it in areas")
+                        debug!("Tried to remove matching_area, but couldn't find it in areas")
                     }
                 }
                 areas.push(new_area);
