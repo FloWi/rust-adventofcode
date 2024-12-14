@@ -1,4 +1,4 @@
-use glam::{U64Vec2, UVec2};
+use glam::U64Vec2;
 use nom::bytes::complete::take_till;
 use nom::character::complete;
 use nom::character::complete::line_ending;
@@ -16,6 +16,7 @@ fn eval_machine(
         prize,
     }: Machine,
 ) -> Option<U64Vec2> {
+    // took the solution from HyperNeutrino on YouTube
     let ax = button_a.x as f64;
     let ay = button_a.y as f64;
     let bx = button_b.x as f64;
@@ -28,27 +29,38 @@ fn eval_machine(
 
     let ca_i64 = ca as u64;
     let cb_i64 = cb as u64;
+
+    // only integer solutions are valid
     (ca == ca_i64 as f64 && cb == cb_i64 as f64).then_some(U64Vec2::new(ca_i64, cb_i64))
 }
 
 #[derive(Debug)]
 struct Machine {
-    button_a: UVec2,
-    button_b: UVec2,
-    prize: UVec2,
+    button_a: U64Vec2,
+    button_b: U64Vec2,
+    prize: U64Vec2,
 }
 
-fn u_vec2_parser(input: &str) -> IResult<&str, UVec2> {
+impl Machine {
+    pub(crate) fn with_fixed_amount_added_to_price_coords(&self, fixed_amount: u64) -> Self {
+        Self {
+            prize: U64Vec2::new(self.prize.x + fixed_amount, self.prize.y + fixed_amount),
+            ..*self
+        }
+    }
+}
+
+fn u_vec2_parser(input: &str) -> IResult<&str, U64Vec2> {
     // will match
     // Button B: X+22, Y+67
     // and
     // Prize: X=8400, Y=5400
     let (rest, (x, y)) = tuple((
-        preceded(take_till(|c: char| c.is_numeric()), complete::u32),
-        preceded(take_till(|c: char| c.is_numeric()), complete::u32),
+        preceded(take_till(|c: char| c.is_numeric()), complete::u64),
+        preceded(take_till(|c: char| c.is_numeric()), complete::u64),
     ))(input)?;
 
-    Ok((rest, UVec2::new(x, y)))
+    Ok((rest, U64Vec2::new(x, y)))
 }
 
 fn machine_parser(input: &str) -> IResult<&str, Machine> {

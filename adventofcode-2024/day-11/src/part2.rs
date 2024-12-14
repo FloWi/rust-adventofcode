@@ -115,8 +115,7 @@ mod tests {
 
     #[test]
     fn test_one_blink() -> miette::Result<()> {
-        let stones: HashMap<u64, usize> =
-            [0, 1, 10, 99, 999].iter().map(|i| *i as u64).counts();
+        let stones: HashMap<u64, usize> = [0, 1, 10, 99, 999].iter().map(|i| *i as u64).counts();
         let actual = apply_rules(&stones, 0);
         let expected = [1, 2024, 1, 0, 9, 9, 2021976]
             .iter()
