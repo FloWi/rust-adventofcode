@@ -1,6 +1,4 @@
-use itertools::Itertools;
 use miette::miette;
-use nom::AsChar;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
@@ -10,7 +8,7 @@ pub fn process(input: &str) -> miette::Result<String> {
         .into_iter()
         .map(|machine| machine.with_fixed_amount_added_to_price_coords(10000000000000))
         .filter_map(crate::eval_machine)
-        .map(|res| res.x * 3 + res.y * 1)
+        .map(|res| res.x * 3 + res.y)
         .sum::<u64>();
 
     Ok(result.to_string())

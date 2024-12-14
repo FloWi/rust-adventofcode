@@ -57,10 +57,8 @@ fn debug_robots(robots: &[Robot], game_field_dimensions: IVec2) -> String {
         .counts();
 
     (0..game_field_dimensions.y)
-        .into_iter()
         .map(|y| {
             let row: String = (0..game_field_dimensions.x)
-                .into_iter()
                 .map(|x| {
                     position_counts
                         .get(&IVec2::new(x, y))

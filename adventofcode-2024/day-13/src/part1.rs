@@ -1,6 +1,4 @@
-use itertools::Itertools;
 use miette::miette;
-use nom::AsChar;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
@@ -9,7 +7,7 @@ pub fn process(input: &str) -> miette::Result<String> {
     let result = machines
         .into_iter()
         .filter_map(crate::eval_machine)
-        .map(|res| res.x * 3 + res.y * 1)
+        .map(|res| res.x * 3 + res.y)
         .sum::<u64>();
 
     Ok(result.to_string())
