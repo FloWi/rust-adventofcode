@@ -8,8 +8,6 @@ use nom::multi::separated_list1;
 use nom::sequence::{preceded, separated_pair};
 use nom::IResult;
 use nom::Parser;
-use std::fs::File;
-use std::io::Write;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
@@ -39,15 +37,21 @@ pub fn process_with_game_field_dimensions(
         }
     };
 
-    let robots_txt = debug_robots(&robots, game_field_dimensions);
+    //write_to_file(&robots, game_field_dimensions);
+
+    Ok(result.to_string())
+}
+
+fn write_to_file(robots: &[Robot], game_field_dimensions: IVec2) {
+    use std::fs::File;
+    use std::io::Write;
+    let robots_txt = debug_robots(robots, game_field_dimensions);
 
     let mut buffer = File::create("robots.txt").expect("unable to create file robots.txt");
 
     buffer
         .write_all(robots_txt.as_bytes())
         .expect("unable to write string to file");
-
-    Ok(result.to_string())
 }
 
 fn debug_robots(robots: &[Robot], game_field_dimensions: IVec2) -> String {
@@ -58,15 +62,14 @@ fn debug_robots(robots: &[Robot], game_field_dimensions: IVec2) -> String {
 
     (0..game_field_dimensions.y)
         .map(|y| {
-            let row: String = (0..game_field_dimensions.x)
+            (0..game_field_dimensions.x)
                 .map(|x| {
                     position_counts
                         .get(&IVec2::new(x, y))
                         .map(|num| num.to_string())
                         .unwrap_or(" ".to_string())
                 })
-                .join("");
-            row
+                .join("")
         })
         .join("\n")
 }
