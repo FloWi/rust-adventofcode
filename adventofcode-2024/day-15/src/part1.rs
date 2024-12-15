@@ -1,4 +1,4 @@
-use crate::part1::MoveResult::{PlayerMovedToEmptySpot, PlayerPushedBoxes, Problem, UnableToMove};
+use crate::part1::MoveResult::{PlayerMovedToEmptySpot, PlayerPushedBoxes, UnableToMove};
 use glam::IVec2;
 use itertools::Either::{Left, Right};
 use itertools::{Either, Itertools};
@@ -10,16 +10,98 @@ use nom::IResult;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::iter::successors;
+use tracing::info;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
-    let (_, warehouse) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
+    let (
+        _,
+        Warehouse {
+            mut game_map,
+            movement_sequence,
+            map_dimensions,
+            player_location: original_player_location,
+        },
+    ) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
 
-    dbg!(warehouse);
+    info!(
+        "Initial state:\n{}",
+        render_map(&game_map, map_dimensions, original_player_location)
+    );
 
-    let result = 42;
+    let mut player_location = original_player_location.clone();
+    for move_direction in movement_sequence {
+        let movement_result = move_player(
+            &mut game_map,
+            &move_direction,
+            map_dimensions,
+            player_location,
+        )?;
+        match movement_result {
+            UnableToMove(_) => {}
+            PlayerMovedToEmptySpot(new_pos) => player_location = new_pos,
+            PlayerPushedBoxes(new_pos) => player_location = new_pos,
+        };
+        let move_char = match move_direction {
+            Direction::West => '<',
+            Direction::North => '^',
+            Direction::East => '>',
+            Direction::South => 'v',
+        };
+
+        info!(
+            "\nMove {move_char}: \n{}",
+            render_map(&game_map, map_dimensions, player_location)
+        );
+    }
+    let result = compute_score(&game_map);
 
     Ok(result.to_string())
+}
+
+fn compute_score(game_map: &HashMap<IVec2, Tile>) -> i32 {
+    // The GPS coordinate of a box is equal to
+    // 100 times its distance from the top edge of the map
+    // plus its distance from the left edge of the map.
+    // (This process does not stop at wall tiles; measure all the way to the edges of the map.)
+    game_map
+        .iter()
+        .map(|(pos, tile)| {
+            let factor = match *tile {
+                Tile::Empty => 0,
+                Tile::Wall => 0,
+                Tile::Box => 1,
+            };
+            factor * (pos.y * 100 + pos.x)
+        })
+        .sum()
+}
+
+fn render_map(
+    game_map: &HashMap<IVec2, Tile>,
+    map_dimensions: IVec2,
+    player_location: IVec2,
+) -> String {
+    (0..map_dimensions.y)
+        .map(|y| {
+            (0..map_dimensions.x)
+                .map(|x| {
+                    let pos = IVec2::new(x, y);
+                    let tile = &game_map[&pos];
+                    let char = if pos == player_location {
+                        "@"
+                    } else {
+                        match tile {
+                            Tile::Empty => ".",
+                            Tile::Wall => "#",
+                            Tile::Box => "0",
+                        }
+                    };
+                    char
+                })
+                .join("")
+        })
+        .join("\n")
 }
 
 #[derive(Debug)]
@@ -50,10 +132,10 @@ struct Warehouse {
 
 fn move_player(
     game_map: &mut HashMap<IVec2, Tile>,
-    direction: Direction,
+    direction: &Direction,
     map_dimensions: IVec2,
     player_location: IVec2,
-) -> MoveResult {
+) -> miette::Result<MoveResult> {
     let x_range = 0..map_dimensions.x;
     let y_range = 0..map_dimensions.y;
 
@@ -72,19 +154,15 @@ fn move_player(
     .skip(1)
     .collect_vec();
 
-    dbg!(&locations_affected_by_move);
-
     let tiles_and_locations_affected_by_move = locations_affected_by_move
         .into_iter()
         .map(|loc| (loc, game_map.get(&loc).unwrap().clone()))
         .collect_vec();
 
-    dbg!(&tiles_and_locations_affected_by_move);
-
     match tiles_and_locations_affected_by_move.first() {
-        None => Problem("No move left (shouldn't happen)"),
-        Some((_pos, Tile::Wall)) => UnableToMove(MoveProblem::PlayerDirectlyBlockedByWall),
-        Some((pos, Tile::Empty)) => PlayerMovedToEmptySpot(*pos),
+        None => miette::bail!("No move left (shouldn't happen)"),
+        Some((_pos, Tile::Wall)) => Ok(UnableToMove(MoveProblem::PlayerDirectlyBlockedByWall)),
+        Some((pos, Tile::Empty)) => Ok(PlayerMovedToEmptySpot(*pos)),
         Some((pos, Tile::Box)) => {
             // these are the scenarios
             // #..0@   // push one box (move first box to first empty space)
@@ -104,12 +182,12 @@ fn move_player(
 
             let first_wall = tiles_and_locations_affected_by_move
                 .iter()
-                .find_map(|(pos, tile)| matches!(tile, Tile::Empty).then_some(pos))
+                .find_map(|(pos, tile)| matches!(tile, Tile::Wall).then_some(pos))
                 .expect("There should _always_ be a wall in line");
 
             let distance_to_first_wall = player_location.distance_squared(*first_wall);
 
-            match maybe_first_empty_space {
+            let result = match maybe_first_empty_space {
                 None => UnableToMove(MoveProblem::NoSpaceToPushBoxes),
                 Some(first_empty_space) => {
                     let distance_to_first_empty_space =
@@ -123,7 +201,9 @@ fn move_player(
                         PlayerPushedBoxes(*pos)
                     }
                 }
-            }
+            };
+
+            Ok(result)
         }
     }
 }
@@ -135,8 +215,7 @@ enum MoveProblem {
 }
 
 #[derive(Debug, PartialEq)]
-enum MoveResult<'a> {
-    Problem(&'a str),
+enum MoveResult {
     UnableToMove(MoveProblem),
     PlayerMovedToEmptySpot(IVec2),
     PlayerPushedBoxes(IVec2),
@@ -310,10 +389,10 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^
         assert_eq!(
             move_player(
                 &mut game_map,
-                Direction::West,
+                &Direction::West,
                 map_dimensions,
                 player_location,
-            ),
+            )?,
             UnableToMove(MoveProblem::PlayerDirectlyBlockedByWall)
         );
         assert_eq!(game_map, original_game_map);
@@ -334,10 +413,10 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^
         assert_eq!(
             move_player(
                 &mut game_map,
-                Direction::East,
+                &Direction::East,
                 map_dimensions,
                 player_location,
-            ),
+            )?,
             PlayerMovedToEmptySpot(player_location + IVec2::X)
         );
         assert_eq!(game_map, original_game_map);
@@ -360,10 +439,10 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^
         assert_eq!(
             move_player(
                 &mut game_map,
-                Direction::East,
+                &Direction::East,
                 map_dimensions,
                 player_location,
-            ),
+            )?,
             PlayerMovedToEmptySpot(pos_after_1st_move)
         );
 
@@ -377,10 +456,10 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^
         assert_eq!(
             move_player(
                 &mut game_map,
-                Direction::East,
+                &Direction::East,
                 map_dimensions,
                 pos_after_1st_move,
-            ),
+            )?,
             PlayerPushedBoxes(pos_after_1st_move + IVec2::X)
         );
         assert_ne!(game_map, original_game_map);
