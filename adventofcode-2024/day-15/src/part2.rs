@@ -497,4 +497,129 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
         assert_eq!(actual_render, expected_render);
         Ok(())
     }
+
+    #[test]
+    fn test_larger_example_push_box_east() -> miette::Result<()> {
+        let input = LARGER_EXAMPLE_STR;
+
+        let (
+            _,
+            Warehouse {
+                game_map: original_game_map,
+                movement_sequence,
+                map_dimensions,
+                player_location,
+            },
+        ) = parse(input).unwrap();
+
+        let mut game_map = original_game_map.clone();
+        let mut new_player_location = player_location.clone();
+        for _ in 0..6 {
+            let result = move_player(
+                &mut game_map,
+                &Direction::East,
+                map_dimensions,
+                new_player_location,
+            )?;
+
+            new_player_location = match result {
+                UnableToMove(_) => player_location,
+                PlayerMovedToEmptySpot(new_loc) => new_loc,
+                PlayerPushedBoxes(new_loc) => new_loc,
+            };
+        }
+
+        let actual_render = render_map(&game_map, map_dimensions, new_player_location);
+
+        let expected_render = r#"
+####################
+##....[]....[]..[]##
+##............[]..##
+##..[][]....[]..[]##
+##....[]......@[].##
+##[]##....[]......##
+##[]....[]....[]..##
+##..[][]..[]..[][]##
+##........[]......##
+####################
+        "#
+        .trim();
+
+        assert_eq!(actual_render, expected_render);
+        Ok(())
+    }
+
+    #[test]
+    fn test_larger_example_push_two_boxes_east() -> miette::Result<()> {
+        let input = LARGER_EXAMPLE_STR;
+
+        let (
+            _,
+            Warehouse {
+                game_map: original_game_map,
+                movement_sequence,
+                map_dimensions,
+                player_location,
+            },
+        ) = parse(input).unwrap();
+
+        // insert a 2nd box right before the first one
+        let mut game_map = original_game_map.clone();
+        game_map.remove(&IVec2::new(12, 4));
+        game_map.remove(&IVec2::new(13, 4));
+        game_map.insert(IVec2::new(12, 4), Tile::Box);
+
+        let actual_render_initial_state = render_map(&game_map, map_dimensions, player_location);
+
+        let expected_render_initial = r#"
+####################
+##....[]....[]..[]##
+##............[]..##
+##..[][]....[]..[]##
+##....[]@...[][]..##
+##[]##....[]......##
+##[]....[]....[]..##
+##..[][]..[]..[][]##
+##........[]......##
+####################
+        "#
+        .trim();
+
+        assert_eq!(actual_render_initial_state, expected_render_initial);
+
+        let mut new_player_location = player_location.clone();
+        for _ in 0..4 {
+            let result = move_player(
+                &mut game_map,
+                &Direction::East,
+                map_dimensions,
+                new_player_location,
+            )?;
+
+            new_player_location = match result {
+                UnableToMove(_) => player_location,
+                PlayerMovedToEmptySpot(new_loc) => new_loc,
+                PlayerPushedBoxes(new_loc) => new_loc,
+            };
+        }
+
+        let actual_render = render_map(&game_map, map_dimensions, new_player_location);
+
+        let expected_render = r#"
+####################
+##....[]....[]..[]##
+##............[]..##
+##..[][]....[]..[]##
+##....[]....@[][].##
+##[]##....[]......##
+##[]....[]....[]..##
+##..[][]..[]..[][]##
+##........[]......##
+####################
+        "#
+        .trim();
+
+        assert_eq!(actual_render, expected_render);
+        Ok(())
+    }
 }
