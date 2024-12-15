@@ -310,10 +310,7 @@ fn parse(input: &str) -> IResult<&str, Warehouse> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_parsing_and_printing_map() -> miette::Result<()> {
-        let input = r#"
-##########
+    const LARGER_EXAMPLE_STR: &str = r#"##########
 #..O..O.O#
 #......O.#
 #.OO..O.O#
@@ -333,9 +330,11 @@ vvv<<^>^v^^><<>>><>^<<><^vv^^<>vvv<>><^^v>^>vv<>v<<<<v<^v>^<^^>>>^<v<v
 >^>>^v>vv>^<<^v<>><<><<v<<v><>v<^vv<<<>^^v^>^^>>><<^v>>v^v><^^>>^<>vv^
 <><^^>^^^<><vvvvv^v<v<<>^v<v>v<<^><<><<><<<^^<<<^<<>><<><^^^>^^<>^>v<>
 ^^>vv<^v^v<vv>^<><v<^v>^^^>>>^^vvv^>vvv<>>>^<^>>>>>^<<^v>^vvv<>^<><<v>
-v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^
-        "#
-        .trim();
+v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
+
+    #[test]
+    fn test_parsing_and_printing_map() -> miette::Result<()> {
+        let input = LARGER_EXAMPLE_STR;
 
         let (
             _,
@@ -356,6 +355,48 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^
 ##............[]..##
 ##..[][]....[]..[]##
 ##....[]@.....[]..##
+##[]##....[]......##
+##[]....[]....[]..##
+##..[][]..[]..[][]##
+##........[]......##
+####################
+        "#
+        .trim();
+
+        assert_eq!(actual_render, expected_render);
+        Ok(())
+    }
+
+    #[test]
+    fn test_larger_example_push_box_west() -> miette::Result<()> {
+        let input = LARGER_EXAMPLE_STR;
+
+        let (
+            _,
+            Warehouse {
+                game_map: original_game_map,
+                movement_sequence,
+                map_dimensions,
+                player_location,
+            },
+        ) = parse(input).unwrap();
+
+        let mut game_map = original_game_map.clone();
+        let result = move_player(
+            &mut game_map,
+            &Direction::West,
+            map_dimensions,
+            player_location,
+        )?;
+
+        let actual_render = render_map(&game_map, map_dimensions, player_location);
+
+        let expected_render = r#"
+####################
+##....[]....[]..[]##
+##............[]..##
+##..[][]....[]..[]##
+##...[]@......[]..##
 ##[]##....[]......##
 ##[]....[]....[]..##
 ##..[][]..[]..[][]##
