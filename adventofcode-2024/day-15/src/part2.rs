@@ -91,10 +91,10 @@ fn render_map(
                         None => "",
                         Some(tile) => {
                             let chars = if pos == player_location {
-                                "@."
+                                "@"
                             } else {
                                 match tile {
-                                    Tile::Empty => "..",
+                                    Tile::Empty => ".",
                                     Tile::Wall => "##",
                                     Tile::Box => "[]",
                                 }
@@ -123,6 +123,16 @@ enum Tile {
     Box,
 }
 
+impl Tile {
+    fn width(&self) -> u32 {
+        match self {
+            Tile::Empty => 1,
+            Tile::Wall => 2,
+            Tile::Box => 2,
+        }
+    }
+}
+
 #[derive(PartialEq)]
 struct Player;
 
@@ -134,25 +144,22 @@ struct Warehouse {
     player_location: IVec2,
 }
 
-fn move_player(
+fn move_player_horizontally(
     game_map: &mut HashMap<IVec2, Tile>,
     direction: &Direction,
     map_dimensions: IVec2,
     player_location: IVec2,
 ) -> miette::Result<MoveResult> {
     let x_range = 0..map_dimensions.x;
-    let y_range = 0..map_dimensions.y;
 
     let offset: IVec2 = match direction {
-        Direction::North => IVec2::NEG_Y,
         Direction::East => IVec2::X,
-        Direction::South => IVec2::Y,
         Direction::West => IVec2::NEG_X,
+        _ => return miette::bail!("Only horizontal moves allowed here."),
     };
     let locations_affected_by_move = successors(Some(player_location.clone()), |pos| {
         let new_pos = pos + offset;
-        let yield_result =
-            (x_range.contains(&new_pos.x) && y_range.contains(&new_pos.y)).then_some(new_pos);
+        let yield_result = x_range.contains(&new_pos.x).then_some(new_pos);
         yield_result
     })
     .skip(1)
@@ -160,8 +167,10 @@ fn move_player(
 
     let tiles_and_locations_affected_by_move = locations_affected_by_move
         .into_iter()
-        .map(|loc| (loc, game_map.get(&loc).unwrap().clone()))
+        .filter_map(|loc| game_map.get(&loc).cloned().map(|tile| (loc, tile.clone())))
         .collect_vec();
+
+    dbg!(&tiles_and_locations_affected_by_move);
 
     match tiles_and_locations_affected_by_move.first() {
         None => miette::bail!("No move left (shouldn't happen)"),
@@ -169,45 +178,108 @@ fn move_player(
         Some((pos, Tile::Empty)) => Ok(PlayerMovedToEmptySpot(*pos)),
         Some((pos, Tile::Box)) => {
             // these are the scenarios
-            // #..0@   // push one box (move first box to first empty space)
-            // #.00@   // push n boxes (move first box to first empty space)
-            // #0@..   // can't move, because no space between box and wall
-            // #00@.   // can't move, because no space between boxes and wall
+            // #.[]@    // push one box (move first box to first empty space)
+            // #.[][]@  // push n boxes (move first box to first empty space)
+            // #[]@..   // can't move, because no space between box and wall
+            // #[][]@.  // can't move, because no space between boxes and wall
 
             //
-            // #..0@   // distance to first empty space: 2; distance to first wall: 4
-            // #.00@   // distance to first empty space: 3; distance to first wall: 4
-            // #0@..   // distance to first empty space: None; distance to first wall: 2
-            // #00@.   // distance to first empty space: None; distance to first wall: 2
+            // #.[]@     // distance to first empty space: 3; distance to first wall: 4
+            // #.[][]@   // distance to first empty space: 5; distance to first wall: 6
+            // #[]@..    // distance to first empty space: None; distance to first wall: 2
+            // #[][]@.   // distance to first empty space: None; distance to first wall: 2
 
-            let maybe_first_empty_space = tiles_and_locations_affected_by_move
+            let boxes_affected_by_move = tiles_and_locations_affected_by_move
                 .iter()
-                .find_map(|(pos, tile)| matches!(tile, Tile::Empty).then_some(pos));
-
-            let first_wall = tiles_and_locations_affected_by_move
+                .take_while(|(loc, tile)| matches!(tile, Tile::Box))
+                .collect_vec();
+            let first_tile_after_boxes = tiles_and_locations_affected_by_move
                 .iter()
-                .find_map(|(pos, tile)| matches!(tile, Tile::Wall).then_some(pos))
-                .expect("There should _always_ be a wall in line");
+                .skip(boxes_affected_by_move.len())
+                .next();
 
-            let distance_to_first_wall = player_location.distance_squared(*first_wall);
+            dbg!(
+                pos,
+                &boxes_affected_by_move,
+                first_tile_after_boxes,
+                pos,
+                player_location,
+                direction
+            );
 
-            let result = match maybe_first_empty_space {
-                None => UnableToMove(MoveProblem::NoSpaceToPushBoxes),
-                Some(first_empty_space) => {
-                    let distance_to_first_empty_space =
-                        player_location.distance_squared(*first_empty_space);
+            let row_before_move = game_map
+                .clone()
+                .into_iter()
+                .filter(|(loc, _)| loc.y == player_location.y)
+                .sorted_by_key(|(loc, _)| loc.x)
+                .collect_vec();
+            dbg!(row_before_move);
 
-                    if distance_to_first_wall < distance_to_first_empty_space {
-                        UnableToMove(MoveProblem::NoSpaceToPushBoxes)
-                    } else {
-                        game_map.insert(*first_empty_space, Tile::Box);
-                        game_map.insert(*pos, Tile::Empty);
-                        PlayerPushedBoxes(*pos)
+            match first_tile_after_boxes {
+                None => {
+                    miette::bail!("shouldn't happen. I expected the first tile after a move to be a wall or empty space")
+                }
+                Some((first_pos_after_boxes, tile)) => {
+                    match tile {
+                        Tile::Empty => {
+                            game_map.remove(first_pos_after_boxes);
+                            // All good, we can move all boxes one over (remove old entries and add new ones)
+                            for (old_box_loc, _) in boxes_affected_by_move {
+                                game_map.remove(&old_box_loc);
+                                let new_box_loc = old_box_loc + offset;
+                                game_map.insert(new_box_loc, Tile::Box);
+                                println!("moved box from {old_box_loc} to {new_box_loc}");
+                            }
+
+                            // add an empty space at the players location
+                            //game_map.insert(player_location, Tile::Empty);
+                            game_map.insert(*pos, Tile::Empty);
+
+                            let row_after_move = game_map
+                                .clone()
+                                .into_iter()
+                                .filter(|(loc, _)| loc.y == player_location.y)
+                                .sorted_by_key(|(loc, _)| loc.x)
+                                .collect_vec();
+                            dbg!(row_after_move);
+
+                            Ok(PlayerPushedBoxes(*pos))
+                        }
+                        Tile::Wall => {
+                            // We hit a wall - no-op
+                            Ok(UnableToMove(MoveProblem::NoSpaceToPushBoxes))
+                        }
+                        Tile::Box => {
+                            miette::bail!("shouldn't happen. I expected the first tile after a move to be a wall or empty space")
+                        }
                     }
                 }
-            };
+            }
+        }
+    }
+}
 
-            Ok(result)
+fn move_player_vertically(
+    game_map: &mut HashMap<IVec2, Tile>,
+    direction: &Direction,
+    map_dimensions: IVec2,
+    player_location: IVec2,
+) -> miette::Result<MoveResult> {
+    unimplemented!()
+}
+
+fn move_player(
+    game_map: &mut HashMap<IVec2, Tile>,
+    direction: &Direction,
+    map_dimensions: IVec2,
+    player_location: IVec2,
+) -> miette::Result<MoveResult> {
+    match direction {
+        Direction::North | Direction::South => {
+            move_player_vertically(game_map, direction, map_dimensions, player_location)
+        }
+        Direction::West | Direction::East => {
+            move_player_horizontally(game_map, direction, map_dimensions, player_location)
         }
     }
 }
@@ -292,6 +364,17 @@ fn parse(input: &str) -> IResult<&str, Warehouse> {
                     Right(tile) => tile,
                 },
             )
+        })
+        .flat_map(|(loc, tile)| {
+            match tile {
+                Tile::Empty => {
+                    // the empty tiles are also of width 2, but here we split them up into two tiles of width 1
+                    vec![(loc, Tile::Empty), (loc + IVec2::X, Tile::Empty)]
+                }
+                tile => {
+                    vec![(loc, tile)]
+                }
+            }
         })
         .collect();
 
@@ -389,7 +472,13 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
             player_location,
         )?;
 
-        let actual_render = render_map(&game_map, map_dimensions, player_location);
+        let new_player_location = match result {
+            UnableToMove(_) => player_location,
+            PlayerMovedToEmptySpot(new_loc) => new_loc,
+            PlayerPushedBoxes(new_loc) => new_loc,
+        };
+
+        let actual_render = render_map(&game_map, map_dimensions, new_player_location);
 
         let expected_render = r#"
 ####################
