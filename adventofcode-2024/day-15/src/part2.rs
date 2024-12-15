@@ -298,7 +298,9 @@ fn move_player_vertically(
         Ok(PlayerMovedToEmptySpot(new_location))
     } else {
         dbg!(
+            &player_location,
             &new_location,
+            direction,
             &maybe_tile_at_new_location,
             &maybe_tile_left_to_new_location
         );
