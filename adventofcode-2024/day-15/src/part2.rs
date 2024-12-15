@@ -9,6 +9,7 @@ use nom::IResult;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::iter::successors;
+use std::ops::Not;
 use tracing::info;
 use MoveResult::{PlayerMovedToEmptySpot, PlayerPushedBoxes, UnableToMove};
 
@@ -265,7 +266,27 @@ fn move_player_vertically(
     map_dimensions: IVec2,
     player_location: IVec2,
 ) -> miette::Result<MoveResult> {
-    unimplemented!()
+    let offset: IVec2 = match direction {
+        Direction::North => IVec2::NEG_Y,
+        Direction::South => IVec2::Y,
+        _ => return miette::bail!("Only horizontal moves allowed here."),
+    };
+
+    let new_location = player_location + offset;
+    let maybe_tile_at_new_location = game_map.get(&new_location);
+    let maybe_tile_left_to_new_location = game_map.get(&(new_location + IVec2::new(-1, 0)));
+
+    if matches!(maybe_tile_at_new_location, Some(Tile::Empty)) {
+        Ok(PlayerMovedToEmptySpot(new_location))
+    } else {
+        dbg!(
+            &new_location,
+            &maybe_tile_at_new_location,
+            &maybe_tile_left_to_new_location
+        );
+
+        todo!()
+    }
 }
 
 fn move_player(
@@ -499,6 +520,102 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
     }
 
     #[test]
+    fn test_larger_example_move_north_empty_space() -> miette::Result<()> {
+        let input = LARGER_EXAMPLE_STR;
+
+        let (
+            _,
+            Warehouse {
+                game_map: original_game_map,
+                movement_sequence,
+                map_dimensions,
+                player_location,
+            },
+        ) = parse(input).unwrap();
+
+        let mut game_map = original_game_map.clone();
+        let result = move_player(
+            &mut game_map,
+            &Direction::North,
+            map_dimensions,
+            player_location,
+        )?;
+
+        let new_player_location = match result {
+            UnableToMove(_) => player_location,
+            PlayerMovedToEmptySpot(new_loc) => new_loc,
+            PlayerPushedBoxes(new_loc) => new_loc,
+        };
+
+        let actual_render = render_map(&game_map, map_dimensions, new_player_location);
+
+        let expected_render = r#"
+####################
+##....[]....[]..[]##
+##............[]..##
+##..[][]@...[]..[]##
+##....[]......[]..##
+##[]##....[]......##
+##[]....[]....[]..##
+##..[][]..[]..[][]##
+##........[]......##
+####################
+        "#
+        .trim();
+
+        assert_eq!(actual_render, expected_render);
+        Ok(())
+    }
+
+    #[test]
+    fn test_larger_example_move_south_empty_space() -> miette::Result<()> {
+        let input = LARGER_EXAMPLE_STR;
+
+        let (
+            _,
+            Warehouse {
+                game_map: original_game_map,
+                movement_sequence,
+                map_dimensions,
+                player_location,
+            },
+        ) = parse(input).unwrap();
+
+        let mut game_map = original_game_map.clone();
+        let result = move_player(
+            &mut game_map,
+            &Direction::South,
+            map_dimensions,
+            player_location,
+        )?;
+
+        let new_player_location = match result {
+            UnableToMove(_) => player_location,
+            PlayerMovedToEmptySpot(new_loc) => new_loc,
+            PlayerPushedBoxes(new_loc) => new_loc,
+        };
+
+        let actual_render = render_map(&game_map, map_dimensions, new_player_location);
+
+        let expected_render = r#"
+####################
+##....[]....[]..[]##
+##............[]..##
+##..[][]....[]..[]##
+##....[]......[]..##
+##[]##..@.[]......##
+##[]....[]....[]..##
+##..[][]..[]..[][]##
+##........[]......##
+####################
+        "#
+        .trim();
+
+        assert_eq!(actual_render, expected_render);
+        Ok(())
+    }
+
+    #[test]
     fn test_larger_example_push_box_east() -> miette::Result<()> {
         let input = LARGER_EXAMPLE_STR;
 
@@ -597,7 +714,7 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
             )?;
 
             new_player_location = match result {
-                UnableToMove(_) => player_location,
+                UnableToMove(_) => new_player_location,
                 PlayerMovedToEmptySpot(new_loc) => new_loc,
                 PlayerPushedBoxes(new_loc) => new_loc,
             };
@@ -611,6 +728,80 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 ##............[]..##
 ##..[][]....[]..[]##
 ##....[]....@[][].##
+##[]##....[]......##
+##[]....[]....[]..##
+##..[][]..[]..[][]##
+##........[]......##
+####################
+        "#
+        .trim();
+
+        assert_eq!(actual_render, expected_render);
+        Ok(())
+    }
+
+    #[test]
+    fn test_larger_example_push_two_boxes_east_until_hit_wall() -> miette::Result<()> {
+        let input = LARGER_EXAMPLE_STR;
+
+        let (
+            _,
+            Warehouse {
+                game_map: original_game_map,
+                movement_sequence,
+                map_dimensions,
+                player_location,
+            },
+        ) = parse(input).unwrap();
+
+        // insert a 2nd box right before the first one
+        let mut game_map = original_game_map.clone();
+        game_map.remove(&IVec2::new(12, 4));
+        game_map.remove(&IVec2::new(13, 4));
+        game_map.insert(IVec2::new(12, 4), Tile::Box);
+
+        let actual_render_initial_state = render_map(&game_map, map_dimensions, player_location);
+
+        let expected_render_initial = r#"
+####################
+##....[]....[]..[]##
+##............[]..##
+##..[][]....[]..[]##
+##....[]@...[][]..##
+##[]##....[]......##
+##[]....[]....[]..##
+##..[][]..[]..[][]##
+##........[]......##
+####################
+        "#
+        .trim();
+
+        assert_eq!(actual_render_initial_state, expected_render_initial);
+
+        let mut new_player_location = player_location.clone();
+        for _ in 0..7 {
+            let result = move_player(
+                &mut game_map,
+                &Direction::East,
+                map_dimensions,
+                new_player_location,
+            )?;
+
+            new_player_location = match result {
+                UnableToMove(_) => new_player_location,
+                PlayerMovedToEmptySpot(new_loc) => new_loc,
+                PlayerPushedBoxes(new_loc) => new_loc,
+            };
+        }
+
+        let actual_render = render_map(&game_map, map_dimensions, new_player_location);
+
+        let expected_render = r#"
+####################
+##....[]....[]..[]##
+##............[]..##
+##..[][]....[]..[]##
+##....[].....@[][]##
 ##[]##....[]......##
 ##[]....[]....[]..##
 ##..[][]..[]..[][]##
