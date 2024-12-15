@@ -30,6 +30,23 @@ pub fn process(input: &str) -> miette::Result<String> {
         render_map(&game_map, map_dimensions, original_player_location)
     );
 
+    perform_moves(
+        &mut game_map,
+        movement_sequence,
+        map_dimensions,
+        original_player_location,
+    )?;
+    let result = compute_score(&game_map);
+
+    Ok(result.to_string())
+}
+
+fn perform_moves(
+    mut game_map: &mut HashMap<IVec2, Tile>,
+    movement_sequence: Vec<Direction>,
+    map_dimensions: IVec2,
+    original_player_location: IVec2,
+) -> miette::Result<IVec2> {
     let mut player_location = original_player_location.clone();
     for move_direction in movement_sequence {
         let movement_result = move_player(
@@ -55,9 +72,7 @@ pub fn process(input: &str) -> miette::Result<String> {
             render_map(&game_map, map_dimensions, player_location)
         );
     }
-    let result = compute_score(&game_map);
-
-    Ok(result.to_string())
+    Ok(player_location)
 }
 
 fn compute_score(game_map: &HashMap<IVec2, Tile>) -> i32 {
@@ -158,6 +173,9 @@ fn move_player_horizontally(
         Direction::West => IVec2::NEG_X,
         _ => return miette::bail!("Only horizontal moves allowed here."),
     };
+
+    let target_player_position = player_location + offset;
+
     let locations_affected_by_move = successors(Some(player_location.clone()), |pos| {
         let new_pos = pos + offset;
         let yield_result = x_range.contains(&new_pos.x).then_some(new_pos);
@@ -177,7 +195,7 @@ fn move_player_horizontally(
         None => miette::bail!("No move left (shouldn't happen)"),
         Some((_pos, Tile::Wall)) => Ok(UnableToMove(MoveProblem::PlayerDirectlyBlockedByWall)),
         Some((pos, Tile::Empty)) => Ok(PlayerMovedToEmptySpot(*pos)),
-        Some((pos, Tile::Box)) => {
+        Some((_, Tile::Box)) => {
             // these are the scenarios
             // #.[]@    // push one box (move first box to first empty space)
             // #.[][]@  // push n boxes (move first box to first empty space)
@@ -200,10 +218,9 @@ fn move_player_horizontally(
                 .next();
 
             dbg!(
-                pos,
+                target_player_position,
                 &boxes_affected_by_move,
                 first_tile_after_boxes,
-                pos,
                 player_location,
                 direction
             );
@@ -227,6 +244,7 @@ fn move_player_horizontally(
                             // All good, we can move all boxes one over (remove old entries and add new ones)
                             for (old_box_loc, _) in boxes_affected_by_move {
                                 game_map.remove(&old_box_loc);
+                                game_map.remove(&(old_box_loc + IVec2::X));
                                 let new_box_loc = old_box_loc + offset;
                                 game_map.insert(new_box_loc, Tile::Box);
                                 println!("moved box from {old_box_loc} to {new_box_loc}");
@@ -234,7 +252,7 @@ fn move_player_horizontally(
 
                             // add an empty space at the players location
                             //game_map.insert(player_location, Tile::Empty);
-                            game_map.insert(*pos, Tile::Empty);
+                            game_map.insert(target_player_position, Tile::Empty);
 
                             let row_after_move = game_map
                                 .clone()
@@ -244,7 +262,7 @@ fn move_player_horizontally(
                                 .collect_vec();
                             dbg!(row_after_move);
 
-                            Ok(PlayerPushedBoxes(*pos))
+                            Ok(PlayerPushedBoxes(target_player_position))
                         }
                         Tile::Wall => {
                             // We hit a wall - no-op
@@ -467,6 +485,8 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
         "#
         .trim();
 
+        assert_eq!(player_location, IVec2::new(8, 4));
+
         assert_eq!(actual_render, expected_render);
         Ok(())
     }
@@ -485,6 +505,18 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
             },
         ) = parse(input).unwrap();
 
+        assert_eq!(player_location, IVec2::new(8, 4));
+
+        let box_positions = original_game_map
+            .iter()
+            .filter_map(|(pos, tile)| matches!(tile, Tile::Box).then_some(*pos))
+            .collect_vec();
+
+        //assert that every box has no entry right next to it
+        for box_pos in box_positions {
+            assert_eq!(original_game_map.get(&(box_pos + IVec2::X)), None);
+        }
+
         let mut game_map = original_game_map.clone();
         let result = move_player(
             &mut game_map,
@@ -493,13 +525,13 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
             player_location,
         )?;
 
-        let new_player_location = match result {
+        let player_location = match result {
             UnableToMove(_) => player_location,
             PlayerMovedToEmptySpot(new_loc) => new_loc,
             PlayerPushedBoxes(new_loc) => new_loc,
         };
 
-        let actual_render = render_map(&game_map, map_dimensions, new_player_location);
+        let actual_render = render_map(&game_map, map_dimensions, player_location);
 
         let expected_render = r#"
 ####################
@@ -514,8 +546,107 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 ####################
         "#
         .trim();
-
         assert_eq!(actual_render, expected_render);
+
+        assert_eq!(player_location, IVec2::new(7, 4));
+
+        assert_eq!(game_map.get(&(player_location)), Some(Tile::Empty).as_ref());
+
+        dbg!(game_map
+            .iter()
+            .filter(|(loc, _)| loc.y == player_location.y)
+            .sorted_by_key(|(loc, _)| loc.x)
+            .collect_vec());
+
+        assert_eq!(game_map.get(&(player_location + IVec2::NEG_X)), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_larger_example_push_t_shape_up() -> miette::Result<()> {
+        let input = LARGER_EXAMPLE_STR;
+
+        let input = r#"
+##########
+#..O..O.O#
+#......O.#
+#.OO..O.O#
+#..O@..O.#
+#O#..O...#
+#O..O..O.#
+#.OO.O.OO#
+#....O...#
+##########
+
+<v<
+"#
+        .trim();
+
+        let (
+            _,
+            Warehouse {
+                game_map: original_game_map,
+                movement_sequence,
+                map_dimensions,
+                player_location,
+            },
+        ) = parse(input).unwrap();
+
+        let mut game_map = original_game_map.clone();
+
+        // we can't create this scenario from parsing the original map, so we perform the moves
+        let player_location = perform_moves(
+            &mut game_map,
+            movement_sequence,
+            map_dimensions,
+            player_location,
+        )?;
+
+        let actual_render_starting_pos = render_map(&game_map, map_dimensions, player_location);
+
+        let expected_render_starting_pos = r#"
+####################
+##....[]....[]..[]##
+##............[]..##
+##..[][]....[]..[]##
+##...[].......[]..##
+##[]##@...[]......##
+##[]....[]....[]..##
+##..[][]..[]..[][]##
+##........[]......##
+####################
+        "#
+        .trim();
+
+        assert_eq!(actual_render_starting_pos, expected_render_starting_pos);
+
+        // moving north should push three boxes
+        let player_location = perform_moves(
+            &mut game_map,
+            vec![Direction::North],
+            map_dimensions,
+            player_location,
+        )?;
+
+        let actual_render_final_pos = render_map(&game_map, map_dimensions, player_location);
+
+        let expected_render_final_pos = r#"
+####################
+##....[]....[]..[]##
+##..[][]......[]..##
+##...[].....[]..[]##
+##....@.......[]..##
+##[]##....[]......##
+##[]....[]....[]..##
+##..[][]..[]..[][]##
+##........[]......##
+####################
+        "#
+        .trim();
+
+        assert_eq!(actual_render_final_pos, expected_render_final_pos);
+
         Ok(())
     }
 
