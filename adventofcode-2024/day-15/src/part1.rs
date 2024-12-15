@@ -1,4 +1,4 @@
-use crate::part1::MoveResult::{PlayerMovedToEmptySpot, Problem, UnableToMove};
+use crate::part1::MoveResult::{PlayerMovedToEmptySpot, PlayerPushedBoxes, Problem, UnableToMove};
 use glam::IVec2;
 use itertools::Either::{Left, Right};
 use itertools::{Either, Itertools};
@@ -76,7 +76,7 @@ fn move_player(
 
     let tiles_and_locations_affected_by_move = locations_affected_by_move
         .into_iter()
-        .map(|loc| (loc, game_map.get(&loc).unwrap()))
+        .map(|loc| (loc, game_map.get(&loc).unwrap().clone()))
         .collect_vec();
 
     dbg!(&tiles_and_locations_affected_by_move);
@@ -85,8 +85,46 @@ fn move_player(
         None => Problem("No move left (shouldn't happen)"),
         Some((_pos, Tile::Wall)) => UnableToMove(MoveProblem::PlayerDirectlyBlockedByWall),
         Some((pos, Tile::Empty)) => PlayerMovedToEmptySpot(*pos),
+        Some((pos, Tile::Box)) => {
+            // these are the scenarios
+            // #..0@   // push one box (move first box to first empty space)
+            // #.00@   // push n boxes (move first box to first empty space)
+            // #0@..   // can't move, because no space between box and wall
+            // #00@.   // can't move, because no space between boxes and wall
 
-        Some((_pos, Tile::Box)) => Problem("Player is facing box - TBD"),
+            //
+            // #..0@   // distance to first empty space: 2; distance to first wall: 4
+            // #.00@   // distance to first empty space: 3; distance to first wall: 4
+            // #0@..   // distance to first empty space: None; distance to first wall: 2
+            // #00@.   // distance to first empty space: None; distance to first wall: 2
+
+            let maybe_first_empty_space = tiles_and_locations_affected_by_move
+                .iter()
+                .find_map(|(pos, tile)| matches!(tile, Tile::Empty).then_some(pos));
+
+            let first_wall = tiles_and_locations_affected_by_move
+                .iter()
+                .find_map(|(pos, tile)| matches!(tile, Tile::Empty).then_some(pos))
+                .expect("There should _always_ be a wall in line");
+
+            let distance_to_first_wall = player_location.distance_squared(*first_wall);
+
+            match maybe_first_empty_space {
+                None => UnableToMove(MoveProblem::NoSpaceToPushBoxes),
+                Some(first_empty_space) => {
+                    let distance_to_first_empty_space =
+                        player_location.distance_squared(*first_empty_space);
+
+                    if distance_to_first_wall < distance_to_first_empty_space {
+                        UnableToMove(MoveProblem::NoSpaceToPushBoxes)
+                    } else {
+                        game_map.insert(*first_empty_space, Tile::Box);
+                        game_map.insert(*pos, Tile::Empty);
+                        PlayerPushedBoxes(*pos)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -184,6 +222,7 @@ fn parse(input: &str) -> IResult<&str, Warehouse> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::part1::MoveResult::PlayerPushedBoxes;
 
     #[test]
     fn test_process() -> miette::Result<()> {
@@ -328,6 +367,12 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^
             PlayerMovedToEmptySpot(pos_after_1st_move)
         );
 
+        /*
+        ########
+        #..O.O.#
+        ##@.O..#
+        */
+
         //2nd move east will push one box
         assert_eq!(
             move_player(
@@ -336,9 +381,11 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^
                 map_dimensions,
                 pos_after_1st_move,
             ),
-            PlayerMovedToEmptySpot(pos_after_1st_move + IVec2::X)
+            PlayerPushedBoxes(pos_after_1st_move + IVec2::X)
         );
-        assert_eq!(game_map, original_game_map);
+        assert_ne!(game_map, original_game_map);
+        assert_eq!(game_map[&IVec2::new(4, 2)], Tile::Empty);
+        assert_eq!(game_map[&IVec2::new(5, 2)], Tile::Box);
 
         Ok(())
     }
