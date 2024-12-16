@@ -1,6 +1,5 @@
-use glam::{IVec2, UVec2};
+use glam::IVec2;
 use itertools::Itertools;
-use pathfinding::matrix::Matrix;
 use pathfinding::prelude::dijkstra;
 use std::collections::HashMap;
 
@@ -8,27 +7,46 @@ use std::collections::HashMap;
 pub fn process(input: &str) -> miette::Result<String> {
     let maze = parse(input);
 
-    let matrix = Matrix::from_fn(maze.height as usize, maze.width as usize, |(y, x)| {
-        maze.map.get(&UVec2::new(x as u32, y as u32)).unwrap()
-    });
+    let successors = |(current_pos, direction): &(IVec2, IVec2)| {
+        let new_forward_location = current_pos + direction;
 
-    let successors = |pos: &(usize, usize)| {
-        matrix
-            .neighbours(*pos, false)
-            .filter(|next_pos| match matrix.get(*next_pos).unwrap() {
-                Tile::Wall => false,
-                Tile::Empty => true,
-            })
-            .map(|next_pos| (next_pos, 1)) // Cost of 1 for each move
-            .collect::<Vec<_>>()
+        let is_horizontal = direction.y == 0;
+        let other_directions = if is_horizontal {
+            vec![IVec2::Y, IVec2::NEG_Y]
+        } else {
+            vec![IVec2::X, IVec2::NEG_X]
+        };
+
+        let forward_neighbor_vec: Vec<((IVec2, IVec2), i32)> =
+            match maze.map.get(&new_forward_location) {
+                None => {
+                    panic!("shouldn't happen")
+                }
+                Some(tile) => match tile {
+                    Tile::Wall => {
+                        vec![]
+                    }
+                    Tile::Empty => {
+                        vec![((new_forward_location, *direction), 1)]
+                    }
+                },
+            };
+
+        let other_directions_neighbors: Vec<((IVec2, IVec2), i32)> = other_directions
+            .into_iter()
+            .map(|new_dir| ((*current_pos, new_dir), 1000))
+            .collect_vec();
+
+        forward_neighbor_vec
+            .into_iter()
+            .chain(other_directions_neighbors)
     };
 
-    if let Some(pathfinding_result) = dijkstra(
-        &(maze.start_pos.y as usize, maze.start_pos.x as usize),
-        successors,
-        |(y, x)| *y == maze.end_pos.y as usize && *x == maze.start_pos.x as usize,
-    ) {
-        let score: u32 = compute_score(IVec2::X, pathfinding_result);
+    if let Some((_pathfinding_result, score)) =
+        dijkstra(&(maze.start_pos, IVec2::X), successors, |(pos, _dir)| {
+            pos == &maze.end_pos
+        })
+    {
         Ok(score.to_string())
     } else {
         panic!("no path found")
@@ -77,9 +95,9 @@ enum Tile {
 
 #[derive(Debug)]
 struct Maze {
-    map: HashMap<UVec2, Tile>,
-    start_pos: UVec2,
-    end_pos: UVec2,
+    map: HashMap<IVec2, Tile>,
+    start_pos: IVec2,
+    end_pos: IVec2,
     width: u32,
     height: u32,
 }
@@ -91,7 +109,7 @@ fn parse(input: &str) -> Maze {
 
     for (y, row) in input.lines().enumerate() {
         for (x, char) in row.char_indices() {
-            let pos = UVec2::new(x as u32, y as u32);
+            let pos = IVec2::new(x as i32, y as i32);
             match char {
                 '#' => {
                     map.insert(pos, Tile::Wall);
@@ -110,8 +128,8 @@ fn parse(input: &str) -> Maze {
         map: map.clone(),
         start_pos: start_pos.unwrap(),
         end_pos: end_pos.unwrap(),
-        width: &map.keys().map(|loc| loc.x).max().unwrap() + 1,
-        height: &map.keys().map(|loc| loc.y).max().unwrap() + 1,
+        width: map.keys().map(|loc| loc.x).max().unwrap() as u32 + 1,
+        height: map.keys().map(|loc| loc.y).max().unwrap() as u32 + 1,
     }
 }
 
