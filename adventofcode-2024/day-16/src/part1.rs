@@ -62,10 +62,7 @@ fn compute_score(starting_direction: IVec2, (path, _): (Vec<(usize, usize)>, i32
 
     let directions = vec![starting_direction]
         .into_iter()
-        .chain(path.into_iter().tuple_windows().map(|(from, to)| {
-            let dir = to - from;
-            dir
-        }))
+        .chain(path.into_iter().tuple_windows().map(|(from, to)| to - from))
         .collect_vec();
 
     dbg!(&directions);
