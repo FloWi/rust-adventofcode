@@ -1,3 +1,4 @@
+use crate::part2::MoveProblem::PlayerDirectlyBlockedByWall;
 use glam::IVec2;
 use itertools::Either::{Left, Right};
 use itertools::{Either, Itertools};
@@ -182,21 +183,90 @@ fn move_player_horizontally(
 
     let target_player_position = player_location + offset;
 
-    let locations_affected_by_move = successors(Some(player_location.clone()), |pos| {
+    let locations_affected_by_move = successors(Some(target_player_position.clone()), |pos| {
         let new_pos = pos + offset;
         let yield_result = x_range.contains(&new_pos.x).then_some(new_pos);
         yield_result
     })
-    .skip(1)
     .collect_vec();
 
     let tiles_and_locations_affected_by_move = locations_affected_by_move
         .into_iter()
-        .filter_map(|loc| game_map.get(&loc).cloned().map(|tile| (loc, tile.clone())))
+        .map(|loc| {
+            let maybe_tile = game_map.get(&loc).cloned();
+            (loc, maybe_tile)
+        })
         .collect_vec();
 
-    dbg!(tiles_and_locations_affected_by_move);
-    todo!()
+    dbg!(&tiles_and_locations_affected_by_move);
+
+    match tiles_and_locations_affected_by_move.first() {
+        None => {
+            panic!("shouldn't happen - ran out of space")
+        }
+        Some((_, None)) => Ok(PlayerMovedToEmptySpot(target_player_position)),
+
+        Some((_loc, Some(tile))) => {
+            match tile {
+                SingleWidthTile::Wall => Ok(UnableToMove(PlayerDirectlyBlockedByWall)),
+                SingleWidthTile::BoxOpen | SingleWidthTile::BoxClose => {
+                    // evaluate further
+                    // todo!("reached branch {tile:?}");
+                    // check first spot after boxes
+                    let neighbouring_boxes = tiles_and_locations_affected_by_move
+                        .iter()
+                        .take_while(|(loc, maybe_tile)| match maybe_tile {
+                            None => false,
+                            Some(tile) => match tile {
+                                SingleWidthTile::Wall => false,
+                                SingleWidthTile::BoxOpen => true,
+                                SingleWidthTile::BoxClose => true,
+                            },
+                        })
+                        .filter_map(|(loc, maybe_tile)| match maybe_tile {
+                            None => None,
+                            Some(tile) => match tile {
+                                SingleWidthTile::Wall => None,
+                                SingleWidthTile::BoxOpen => Some((loc, SingleWidthTile::BoxOpen)),
+                                SingleWidthTile::BoxClose => Some((loc, SingleWidthTile::BoxClose)),
+                            },
+                        })
+                        .collect_vec();
+
+                    let maybe_first_tile_after_boxes = tiles_and_locations_affected_by_move
+                        .iter()
+                        .skip(neighbouring_boxes.len())
+                        .next();
+                    match maybe_first_tile_after_boxes {
+                        None => {
+                            panic!("shouldn't happen - ran out of space")
+                        }
+                        Some((loc, maybe_tile)) => {
+                            match maybe_tile {
+                                None => {
+                                    // we found an empty slot to push the boxes
+                                    for (loc, _) in neighbouring_boxes.iter() {
+                                        game_map.remove(loc);
+                                    }
+                                    for (loc, box_tile) in neighbouring_boxes {
+                                        game_map.insert(loc + offset, box_tile);
+                                    }
+
+                                    Ok(PlayerPushedBoxes(target_player_position))
+
+                                }
+                                Some(SingleWidthTile::Wall) => {
+                                    Ok(UnableToMove(MoveProblem::NoSpaceToPushBoxes))
+                                }
+                                _ =>
+                                    panic!("shouldn't happen - {maybe_tile:?} should have been handled earlier")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn move_player_vertically(
@@ -436,16 +506,6 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 
         assert_eq!(player_location, IVec2::new(8, 4));
 
-        let box_positions = original_game_map
-            .iter()
-            .filter_map(|(pos, tile)| matches!(tile, SingleWidthTile::BoxOpen).then_some(*pos))
-            .collect_vec();
-
-        //assert that every box has no entry right next to it
-        for box_pos in box_positions {
-            assert_eq!(original_game_map.get(&(box_pos + IVec2::X)), None);
-        }
-
         let mut game_map = original_game_map.clone();
         let result = move_player(
             &mut game_map,
@@ -487,7 +547,10 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
             .sorted_by_key(|(loc, _)| loc.x)
             .collect_vec());
 
-        assert_eq!(game_map.get(&(player_location + IVec2::NEG_X)), None);
+        assert_eq!(
+            game_map.get(&(player_location + IVec2::NEG_X)),
+            Some(SingleWidthTile::BoxClose).as_ref()
+        );
 
         Ok(())
     }
