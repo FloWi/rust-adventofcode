@@ -84,7 +84,6 @@ fn compute_score(game_map: &HashMap<IVec2, SingleWidthTile>) -> i32 {
         .iter()
         .map(|(pos, tile)| {
             let factor = match *tile {
-                SingleWidthTile::Empty => 0,
                 SingleWidthTile::Wall => 0,
                 SingleWidthTile::BoxOpen => 1,
                 SingleWidthTile::BoxClose => 0,
@@ -105,20 +104,18 @@ fn render_map(
                 .map(|x| {
                     let pos = IVec2::new(x, y);
                     match &game_map.get(&pos) {
-                        None => "",
-                        Some(tile) => {
-                            let chars = if pos == player_location {
+                        None => {
+                            if pos == player_location {
                                 "@"
                             } else {
-                                match tile {
-                                    SingleWidthTile::Empty => ".",
-                                    SingleWidthTile::Wall => "#",
-                                    SingleWidthTile::BoxOpen => "[",
-                                    SingleWidthTile::BoxClose => "]",
-                                }
-                            };
-                            chars
+                                "."
+                            }
                         }
+                        Some(tile) => match tile {
+                            SingleWidthTile::Wall => "#",
+                            SingleWidthTile::BoxOpen => "[",
+                            SingleWidthTile::BoxClose => "]",
+                        },
                     }
                 })
                 .join("")
@@ -143,7 +140,6 @@ enum OriginalTile {
 
 #[derive(Clone, Debug, PartialEq)]
 enum SingleWidthTile {
-    Empty,
     Wall,
     BoxOpen,
     BoxClose,
@@ -219,7 +215,7 @@ fn move_player_vertically(
     let maybe_tile_at_new_location = game_map.get(&new_location);
     let maybe_tile_left_to_new_location = game_map.get(&(new_location + IVec2::new(-1, 0)));
 
-    if matches!(maybe_tile_at_new_location, Some(SingleWidthTile::Empty)) {
+    if matches!(maybe_tile_at_new_location, None) {
         Ok(PlayerMovedToEmptySpot(new_location))
     } else {
         dbg!(
@@ -333,10 +329,7 @@ fn parse(input: &str) -> IResult<&str, Warehouse> {
         })
         .flat_map(|(loc, tile)| match tile {
             OriginalTile::Empty => {
-                vec![
-                    (loc, SingleWidthTile::Empty),
-                    (loc + IVec2::X, SingleWidthTile::Empty),
-                ]
+                vec![]
             }
             OriginalTile::Wall => {
                 vec![
@@ -486,10 +479,7 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 
         assert_eq!(player_location, IVec2::new(7, 4));
 
-        assert_eq!(
-            game_map.get(&(player_location)),
-            Some(SingleWidthTile::Empty).as_ref()
-        );
+        assert_eq!(game_map.get(&(player_location)), None);
 
         dbg!(game_map
             .iter()
