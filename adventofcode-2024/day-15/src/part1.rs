@@ -29,7 +29,7 @@ pub fn process(input: &str) -> miette::Result<String> {
         render_map(&game_map, map_dimensions, original_player_location)
     );
 
-    let mut player_location = original_player_location.clone();
+    let mut player_location = original_player_location;
     for move_direction in movement_sequence {
         let movement_result = move_player(
             &mut game_map,
@@ -88,7 +88,8 @@ fn render_map(
                 .map(|x| {
                     let pos = IVec2::new(x, y);
                     let tile = &game_map[&pos];
-                    let char = if pos == player_location {
+
+                    if pos == player_location {
                         "@"
                     } else {
                         match tile {
@@ -96,8 +97,7 @@ fn render_map(
                             Tile::Wall => "#",
                             Tile::Box => "0",
                         }
-                    };
-                    char
+                    }
                 })
                 .join("")
         })
@@ -145,11 +145,10 @@ fn move_player(
         Direction::South => IVec2::Y,
         Direction::West => IVec2::NEG_X,
     };
-    let locations_affected_by_move = successors(Some(player_location.clone()), |pos| {
+    let locations_affected_by_move = successors(Some(player_location), |pos| {
         let new_pos = pos + offset;
-        let yield_result =
-            (x_range.contains(&new_pos.x) && y_range.contains(&new_pos.y)).then_some(new_pos);
-        yield_result
+
+        (x_range.contains(&new_pos.x) && y_range.contains(&new_pos.y)).then_some(new_pos)
     })
     .skip(1)
     .collect_vec();

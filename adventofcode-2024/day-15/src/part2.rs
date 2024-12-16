@@ -9,9 +9,8 @@ use nom::multi::{many1, separated_list1};
 use nom::sequence::{separated_pair, tuple};
 use nom::IResult;
 use std::cmp::PartialEq;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::iter::successors;
-use std::ops::Not;
 use tracing::{debug, info};
 use MoveResult::{PlayerMovedToEmptySpot, PlayerPushedBoxes, UnableToMove};
 
@@ -44,19 +43,15 @@ pub fn process(input: &str) -> miette::Result<String> {
 }
 
 fn perform_moves(
-    mut game_map: &mut HashMap<IVec2, SingleWidthTile>,
+    game_map: &mut HashMap<IVec2, SingleWidthTile>,
     movement_sequence: Vec<Direction>,
     map_dimensions: IVec2,
     original_player_location: IVec2,
 ) -> miette::Result<IVec2> {
-    let mut player_location = original_player_location.clone();
+    let mut player_location = original_player_location;
     for move_direction in movement_sequence {
-        let movement_result = move_player(
-            &mut game_map,
-            &move_direction,
-            map_dimensions,
-            player_location,
-        )?;
+        let movement_result =
+            move_player(game_map, &move_direction, map_dimensions, player_location)?;
         match movement_result {
             UnableToMove(_) => {}
             PlayerMovedToEmptySpot(new_pos) => player_location = new_pos,
@@ -71,7 +66,7 @@ fn perform_moves(
 
         info!(
             "\nMove {move_char}: \n{}",
-            render_map(&game_map, map_dimensions, player_location)
+            render_map(game_map, map_dimensions, player_location)
         );
     }
     Ok(player_location)
@@ -184,10 +179,10 @@ fn move_player_horizontally(
 
     let target_player_position = player_location + offset;
 
-    let locations_affected_by_move = successors(Some(target_player_position.clone()), |pos| {
+    let locations_affected_by_move = successors(Some(target_player_position), |pos| {
         let new_pos = pos + offset;
-        let yield_result = x_range.contains(&new_pos.x).then_some(new_pos);
-        yield_result
+
+        x_range.contains(&new_pos.x).then_some(new_pos)
     })
     .collect_vec();
 
@@ -232,10 +227,8 @@ fn move_player_horizontally(
                         })
                         .collect_vec();
 
-                    let maybe_first_tile_after_boxes = tiles_and_locations_affected_by_move
-                        .iter()
-                        .skip(neighbouring_boxes.len())
-                        .next();
+                    let maybe_first_tile_after_boxes =
+                        tiles_and_locations_affected_by_move.get(neighbouring_boxes.len());
                     match maybe_first_tile_after_boxes {
                         None => {
                             panic!("shouldn't happen - ran out of space")
@@ -286,7 +279,7 @@ fn move_player_vertically(
     match maybe_tile_at_new_location {
         None => Ok(PlayerMovedToEmptySpot(new_location)),
         Some(SingleWidthTile::Wall) => Ok(UnableToMove(PlayerDirectlyBlockedByWall)),
-        Some((BoxOpen | BoxClose)) => {
+        Some(BoxOpen | BoxClose) => {
             match find_all_boxes_affected_by_move(player_location, offset, game_map) {
                 Ok(affected_boxes) => {
                     for (loc, _) in affected_boxes.iter() {
@@ -800,7 +793,7 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
         ) = parse(input).unwrap();
 
         let mut game_map = original_game_map.clone();
-        let mut new_player_location = player_location.clone();
+        let mut new_player_location = player_location;
         for _ in 0..6 {
             let result = move_player(
                 &mut game_map,
@@ -873,7 +866,7 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 
         assert_eq!(actual_render_initial_state, expected_render_initial);
 
-        let mut new_player_location = player_location.clone();
+        let mut new_player_location = player_location;
         for _ in 0..4 {
             let result = move_player(
                 &mut game_map,
@@ -946,7 +939,7 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 
         assert_eq!(actual_render_initial_state, expected_render_initial);
 
-        let mut new_player_location = player_location.clone();
+        let mut new_player_location = player_location;
         for _ in 0..7 {
             let result = move_player(
                 &mut game_map,
