@@ -1,4 +1,5 @@
 use crate::part2::MoveProblem::PlayerDirectlyBlockedByWall;
+use crate::part2::SingleWidthTile::{BoxClose, BoxOpen};
 use glam::IVec2;
 use itertools::Either::{Left, Right};
 use itertools::{Either, Itertools};
@@ -8,10 +9,10 @@ use nom::multi::{many1, separated_list1};
 use nom::sequence::{separated_pair, tuple};
 use nom::IResult;
 use std::cmp::PartialEq;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::successors;
 use std::ops::Not;
-use tracing::info;
+use tracing::{debug, info};
 use MoveResult::{PlayerMovedToEmptySpot, PlayerPushedBoxes, UnableToMove};
 
 #[tracing::instrument]
@@ -86,8 +87,8 @@ fn compute_score(game_map: &HashMap<IVec2, SingleWidthTile>) -> i32 {
         .map(|(pos, tile)| {
             let factor = match *tile {
                 SingleWidthTile::Wall => 0,
-                SingleWidthTile::BoxOpen => 1,
-                SingleWidthTile::BoxClose => 0,
+                BoxOpen => 1,
+                BoxClose => 0,
             };
             factor * (pos.y * 100 + pos.x)
         })
@@ -114,8 +115,8 @@ fn render_map(
                         }
                         Some(tile) => match tile {
                             SingleWidthTile::Wall => "#",
-                            SingleWidthTile::BoxOpen => "[",
-                            SingleWidthTile::BoxClose => "]",
+                            BoxOpen => "[",
+                            BoxClose => "]",
                         },
                     }
                 })
@@ -198,8 +199,6 @@ fn move_player_horizontally(
         })
         .collect_vec();
 
-    dbg!(&tiles_and_locations_affected_by_move);
-
     match tiles_and_locations_affected_by_move.first() {
         None => {
             panic!("shouldn't happen - ran out of space")
@@ -209,7 +208,7 @@ fn move_player_horizontally(
         Some((_loc, Some(tile))) => {
             match tile {
                 SingleWidthTile::Wall => Ok(UnableToMove(PlayerDirectlyBlockedByWall)),
-                SingleWidthTile::BoxOpen | SingleWidthTile::BoxClose => {
+                BoxOpen | BoxClose => {
                     // evaluate further
                     // todo!("reached branch {tile:?}");
                     // check first spot after boxes
@@ -219,16 +218,16 @@ fn move_player_horizontally(
                             None => false,
                             Some(tile) => match tile {
                                 SingleWidthTile::Wall => false,
-                                SingleWidthTile::BoxOpen => true,
-                                SingleWidthTile::BoxClose => true,
+                                BoxOpen => true,
+                                BoxClose => true,
                             },
                         })
                         .filter_map(|(loc, maybe_tile)| match maybe_tile {
                             None => None,
                             Some(tile) => match tile {
                                 SingleWidthTile::Wall => None,
-                                SingleWidthTile::BoxOpen => Some((loc, SingleWidthTile::BoxOpen)),
-                                SingleWidthTile::BoxClose => Some((loc, SingleWidthTile::BoxClose)),
+                                BoxOpen => Some((loc, BoxOpen)),
+                                BoxClose => Some((loc, BoxClose)),
                             },
                         })
                         .collect_vec();
@@ -283,21 +282,72 @@ fn move_player_vertically(
 
     let new_location = player_location + offset;
     let maybe_tile_at_new_location = game_map.get(&new_location);
-    let maybe_tile_left_to_new_location = game_map.get(&(new_location + IVec2::new(-1, 0)));
 
-    if matches!(maybe_tile_at_new_location, None) {
-        Ok(PlayerMovedToEmptySpot(new_location))
-    } else {
-        dbg!(
-            &player_location,
-            &new_location,
-            direction,
-            &maybe_tile_at_new_location,
-            &maybe_tile_left_to_new_location
-        );
-
-        todo!()
+    match maybe_tile_at_new_location {
+        None => Ok(PlayerMovedToEmptySpot(new_location)),
+        Some(SingleWidthTile::Wall) => Ok(UnableToMove(PlayerDirectlyBlockedByWall)),
+        Some((BoxOpen | BoxClose)) => {
+            match find_all_boxes_affected_by_move(player_location, offset, game_map) {
+                Ok(affected_boxes) => {
+                    for (loc, _) in affected_boxes.iter() {
+                        game_map.remove(loc);
+                    }
+                    for (loc, tile) in affected_boxes {
+                        game_map.insert(loc + offset, tile);
+                    }
+                    Ok(PlayerPushedBoxes(new_location))
+                }
+                Err(_) => Ok(UnableToMove(MoveProblem::NoSpaceToPushBoxes)),
+            }
+        }
     }
+}
+
+fn find_all_boxes_affected_by_move(
+    initial_position: IVec2,
+    offset: IVec2,
+    game_map: &HashMap<IVec2, SingleWidthTile>,
+) -> miette::Result<HashMap<IVec2, SingleWidthTile>> {
+    let mut done_map = HashMap::new();
+    let mut open_list = VecDeque::from([initial_position + offset]);
+
+    while let Some(new_pos) = open_list.pop_front() {
+        if done_map.contains_key(&new_pos) {
+            continue;
+        }
+
+        let maybe_tile_at_new_pos = game_map.get(&new_pos);
+        debug!("evaluating {new_pos}: {maybe_tile_at_new_pos:?}");
+
+        match maybe_tile_at_new_pos {
+            None => {}
+            Some(tile) => match tile {
+                SingleWidthTile::Wall => {
+                    return miette::bail!("Can't move - {tile:?} blocks location {new_pos}")
+                }
+                BoxOpen => {
+                    let pos_other_box_tile = new_pos + IVec2::X;
+
+                    done_map.insert(new_pos, BoxOpen);
+                    //ok_list.insert(pos_other_box_tile, BoxClose);
+
+                    open_list.push_back(new_pos + offset);
+                    open_list.push_back(pos_other_box_tile);
+                }
+                BoxClose => {
+                    let pos_other_box_tile = new_pos - IVec2::X;
+
+                    //ok_list.insert(pos_other_box_tile, BoxOpen);
+                    done_map.insert(new_pos, BoxClose);
+
+                    open_list.push_back(new_pos + offset);
+                    open_list.push_back(pos_other_box_tile);
+                }
+            },
+        }
+    }
+
+    Ok(done_map)
 }
 
 fn move_player(
@@ -408,10 +458,7 @@ fn parse(input: &str) -> IResult<&str, Warehouse> {
                 ]
             }
             OriginalTile::Box => {
-                vec![
-                    (loc, SingleWidthTile::BoxOpen),
-                    (loc + IVec2::X, SingleWidthTile::BoxClose),
-                ]
+                vec![(loc, BoxOpen), (loc + IVec2::X, BoxClose)]
             }
         })
         .collect();
@@ -549,7 +596,7 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 
         assert_eq!(
             game_map.get(&(player_location + IVec2::NEG_X)),
-            Some(SingleWidthTile::BoxClose).as_ref()
+            Some(BoxClose).as_ref()
         );
 
         Ok(())
@@ -805,8 +852,8 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 
         // insert a 2nd box right before the first one
         let mut game_map = original_game_map.clone();
-        game_map.insert(IVec2::new(12, 4), SingleWidthTile::BoxOpen);
-        game_map.insert(IVec2::new(13, 4), SingleWidthTile::BoxClose);
+        game_map.insert(IVec2::new(12, 4), BoxOpen);
+        game_map.insert(IVec2::new(13, 4), BoxClose);
 
         let actual_render_initial_state = render_map(&game_map, map_dimensions, player_location);
 
@@ -878,8 +925,8 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 
         // insert a 2nd box right before the first one
         let mut game_map = original_game_map.clone();
-        game_map.insert(IVec2::new(12, 4), SingleWidthTile::BoxOpen);
-        game_map.insert(IVec2::new(13, 4), SingleWidthTile::BoxClose);
+        game_map.insert(IVec2::new(12, 4), BoxOpen);
+        game_map.insert(IVec2::new(13, 4), BoxClose);
 
         let actual_render_initial_state = render_map(&game_map, map_dimensions, player_location);
 
