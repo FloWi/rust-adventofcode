@@ -42,7 +42,7 @@ pub fn process(input: &str) -> miette::Result<String> {
 }
 
 fn perform_moves(
-    mut game_map: &mut HashMap<IVec2, Tile>,
+    mut game_map: &mut HashMap<IVec2, SingleWidthTile>,
     movement_sequence: Vec<Direction>,
     map_dimensions: IVec2,
     original_player_location: IVec2,
@@ -75,7 +75,7 @@ fn perform_moves(
     Ok(player_location)
 }
 
-fn compute_score(game_map: &HashMap<IVec2, Tile>) -> i32 {
+fn compute_score(game_map: &HashMap<IVec2, SingleWidthTile>) -> i32 {
     // The GPS coordinate of a box is equal to
     // 100 times its distance from the top edge of the map
     // plus its distance from the left edge of the map.
@@ -84,9 +84,10 @@ fn compute_score(game_map: &HashMap<IVec2, Tile>) -> i32 {
         .iter()
         .map(|(pos, tile)| {
             let factor = match *tile {
-                Tile::Empty => 0,
-                Tile::Wall => 0,
-                Tile::Box => 1,
+                SingleWidthTile::Empty => 0,
+                SingleWidthTile::Wall => 0,
+                SingleWidthTile::BoxOpen => 1,
+                SingleWidthTile::BoxClose => 0,
             };
             factor * (pos.y * 100 + pos.x)
         })
@@ -94,7 +95,7 @@ fn compute_score(game_map: &HashMap<IVec2, Tile>) -> i32 {
 }
 
 fn render_map(
-    game_map: &HashMap<IVec2, Tile>,
+    game_map: &HashMap<IVec2, SingleWidthTile>,
     map_dimensions: IVec2,
     player_location: IVec2,
 ) -> String {
@@ -110,9 +111,10 @@ fn render_map(
                                 "@"
                             } else {
                                 match tile {
-                                    Tile::Empty => ".",
-                                    Tile::Wall => "##",
-                                    Tile::Box => "[]",
+                                    SingleWidthTile::Empty => ".",
+                                    SingleWidthTile::Wall => "#",
+                                    SingleWidthTile::BoxOpen => "[",
+                                    SingleWidthTile::BoxClose => "]",
                                 }
                             };
                             chars
@@ -133,18 +135,26 @@ enum Direction {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum Tile {
+enum OriginalTile {
     Empty,
     Wall,
     Box,
 }
 
-impl Tile {
+#[derive(Clone, Debug, PartialEq)]
+enum SingleWidthTile {
+    Empty,
+    Wall,
+    BoxOpen,
+    BoxClose,
+}
+
+impl OriginalTile {
     fn width(&self) -> u32 {
         match self {
-            Tile::Empty => 1,
-            Tile::Wall => 2,
-            Tile::Box => 2,
+            OriginalTile::Empty => 1,
+            OriginalTile::Wall => 2,
+            OriginalTile::Box => 2,
         }
     }
 }
@@ -154,14 +164,14 @@ struct Player;
 
 #[derive(Debug)]
 struct Warehouse {
-    game_map: HashMap<IVec2, Tile>,
+    game_map: HashMap<IVec2, SingleWidthTile>,
     movement_sequence: Vec<Direction>,
     map_dimensions: IVec2,
     player_location: IVec2,
 }
 
 fn move_player_horizontally(
-    game_map: &mut HashMap<IVec2, Tile>,
+    game_map: &mut HashMap<IVec2, SingleWidthTile>,
     direction: &Direction,
     map_dimensions: IVec2,
     player_location: IVec2,
@@ -189,97 +199,12 @@ fn move_player_horizontally(
         .filter_map(|loc| game_map.get(&loc).cloned().map(|tile| (loc, tile.clone())))
         .collect_vec();
 
-    dbg!(&tiles_and_locations_affected_by_move);
-
-    match tiles_and_locations_affected_by_move.first() {
-        None => miette::bail!("No move left (shouldn't happen)"),
-        Some((_pos, Tile::Wall)) => Ok(UnableToMove(MoveProblem::PlayerDirectlyBlockedByWall)),
-        Some((pos, Tile::Empty)) => Ok(PlayerMovedToEmptySpot(*pos)),
-        Some((_, Tile::Box)) => {
-            // these are the scenarios
-            // #.[]@    // push one box (move first box to first empty space)
-            // #.[][]@  // push n boxes (move first box to first empty space)
-            // #[]@..   // can't move, because no space between box and wall
-            // #[][]@.  // can't move, because no space between boxes and wall
-
-            //
-            // #.[]@     // distance to first empty space: 3; distance to first wall: 4
-            // #.[][]@   // distance to first empty space: 5; distance to first wall: 6
-            // #[]@..    // distance to first empty space: None; distance to first wall: 2
-            // #[][]@.   // distance to first empty space: None; distance to first wall: 2
-
-            let boxes_affected_by_move = tiles_and_locations_affected_by_move
-                .iter()
-                .take_while(|(loc, tile)| matches!(tile, Tile::Box))
-                .collect_vec();
-            let first_tile_after_boxes = tiles_and_locations_affected_by_move
-                .iter()
-                .skip(boxes_affected_by_move.len())
-                .next();
-
-            dbg!(
-                target_player_position,
-                &boxes_affected_by_move,
-                first_tile_after_boxes,
-                player_location,
-                direction
-            );
-
-            let row_before_move = game_map
-                .clone()
-                .into_iter()
-                .filter(|(loc, _)| loc.y == player_location.y)
-                .sorted_by_key(|(loc, _)| loc.x)
-                .collect_vec();
-            dbg!(row_before_move);
-
-            match first_tile_after_boxes {
-                None => {
-                    miette::bail!("shouldn't happen. I expected the first tile after a move to be a wall or empty space")
-                }
-                Some((first_pos_after_boxes, tile)) => {
-                    match tile {
-                        Tile::Empty => {
-                            game_map.remove(first_pos_after_boxes);
-                            // All good, we can move all boxes one over (remove old entries and add new ones)
-                            for (old_box_loc, _) in boxes_affected_by_move {
-                                game_map.remove(&old_box_loc);
-                                game_map.remove(&(old_box_loc + IVec2::X));
-                                let new_box_loc = old_box_loc + offset;
-                                game_map.insert(new_box_loc, Tile::Box);
-                                println!("moved box from {old_box_loc} to {new_box_loc}");
-                            }
-
-                            // add an empty space at the players location
-                            //game_map.insert(player_location, Tile::Empty);
-                            game_map.insert(target_player_position, Tile::Empty);
-
-                            let row_after_move = game_map
-                                .clone()
-                                .into_iter()
-                                .filter(|(loc, _)| loc.y == player_location.y)
-                                .sorted_by_key(|(loc, _)| loc.x)
-                                .collect_vec();
-                            dbg!(row_after_move);
-
-                            Ok(PlayerPushedBoxes(target_player_position))
-                        }
-                        Tile::Wall => {
-                            // We hit a wall - no-op
-                            Ok(UnableToMove(MoveProblem::NoSpaceToPushBoxes))
-                        }
-                        Tile::Box => {
-                            miette::bail!("shouldn't happen. I expected the first tile after a move to be a wall or empty space")
-                        }
-                    }
-                }
-            }
-        }
-    }
+    dbg!(tiles_and_locations_affected_by_move);
+    todo!()
 }
 
 fn move_player_vertically(
-    game_map: &mut HashMap<IVec2, Tile>,
+    game_map: &mut HashMap<IVec2, SingleWidthTile>,
     direction: &Direction,
     map_dimensions: IVec2,
     player_location: IVec2,
@@ -294,7 +219,7 @@ fn move_player_vertically(
     let maybe_tile_at_new_location = game_map.get(&new_location);
     let maybe_tile_left_to_new_location = game_map.get(&(new_location + IVec2::new(-1, 0)));
 
-    if matches!(maybe_tile_at_new_location, Some(Tile::Empty)) {
+    if matches!(maybe_tile_at_new_location, Some(SingleWidthTile::Empty)) {
         Ok(PlayerMovedToEmptySpot(new_location))
     } else {
         dbg!(
@@ -310,7 +235,7 @@ fn move_player_vertically(
 }
 
 fn move_player(
-    game_map: &mut HashMap<IVec2, Tile>,
+    game_map: &mut HashMap<IVec2, SingleWidthTile>,
     direction: &Direction,
     map_dimensions: IVec2,
     player_location: IVec2,
@@ -345,15 +270,15 @@ fn parse(input: &str) -> IResult<&str, Warehouse> {
         separated_list1(line_ending, many1(one_of("^>v<"))),
     )(input)?;
 
-    let game_map_with_player: HashMap<IVec2, Either<Player, Tile>> = game_map_chars
+    let game_map_with_player: HashMap<IVec2, Either<Player, OriginalTile>> = game_map_chars
         .iter()
         .enumerate()
         .flat_map(|(y, row)| {
             row.iter().enumerate().map(move |(x, char)| {
                 let tile = match *char {
-                    '.' => Right(Tile::Empty),
-                    'O' => Right(Tile::Box),
-                    '#' => Right(Tile::Wall),
+                    '.' => Right(OriginalTile::Empty),
+                    'O' => Right(OriginalTile::Box),
+                    '#' => Right(OriginalTile::Wall),
                     '@' => Left(Player),
                     unknown => {
                         panic!("Tile '{unknown}' is unknown. Should not happen")
@@ -395,26 +320,35 @@ fn parse(input: &str) -> IResult<&str, Warehouse> {
         * scale_factor;
 
     //create game_map with tiles only (player is removed)
-    let game_map: HashMap<IVec2, Tile> = game_map_with_player
+    let game_map: HashMap<IVec2, SingleWidthTile> = game_map_with_player
         .into_iter()
         .map(|(IVec2 { x, y }, either_player_or_tile)| {
             (
                 IVec2 { x: x * 2, y },
                 match either_player_or_tile {
-                    Left(Player) => Tile::Empty,
+                    Left(Player) => OriginalTile::Empty,
                     Right(tile) => tile,
                 },
             )
         })
-        .flat_map(|(loc, tile)| {
-            match tile {
-                Tile::Empty => {
-                    // the empty tiles are also of width 2, but here we split them up into two tiles of width 1
-                    vec![(loc, Tile::Empty), (loc + IVec2::X, Tile::Empty)]
-                }
-                tile => {
-                    vec![(loc, tile)]
-                }
+        .flat_map(|(loc, tile)| match tile {
+            OriginalTile::Empty => {
+                vec![
+                    (loc, SingleWidthTile::Empty),
+                    (loc + IVec2::X, SingleWidthTile::Empty),
+                ]
+            }
+            OriginalTile::Wall => {
+                vec![
+                    (loc, SingleWidthTile::Wall),
+                    (loc + IVec2::X, SingleWidthTile::Wall),
+                ]
+            }
+            OriginalTile::Box => {
+                vec![
+                    (loc, SingleWidthTile::BoxOpen),
+                    (loc + IVec2::X, SingleWidthTile::BoxClose),
+                ]
             }
         })
         .collect();
@@ -511,7 +445,7 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 
         let box_positions = original_game_map
             .iter()
-            .filter_map(|(pos, tile)| matches!(tile, Tile::Box).then_some(*pos))
+            .filter_map(|(pos, tile)| matches!(tile, SingleWidthTile::BoxOpen).then_some(*pos))
             .collect_vec();
 
         //assert that every box has no entry right next to it
@@ -552,7 +486,10 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 
         assert_eq!(player_location, IVec2::new(7, 4));
 
-        assert_eq!(game_map.get(&(player_location)), Some(Tile::Empty).as_ref());
+        assert_eq!(
+            game_map.get(&(player_location)),
+            Some(SingleWidthTile::Empty).as_ref()
+        );
 
         dbg!(game_map
             .iter()
@@ -815,9 +752,8 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 
         // insert a 2nd box right before the first one
         let mut game_map = original_game_map.clone();
-        game_map.remove(&IVec2::new(12, 4));
-        game_map.remove(&IVec2::new(13, 4));
-        game_map.insert(IVec2::new(12, 4), Tile::Box);
+        game_map.insert(IVec2::new(12, 4), SingleWidthTile::BoxOpen);
+        game_map.insert(IVec2::new(13, 4), SingleWidthTile::BoxClose);
 
         let actual_render_initial_state = render_map(&game_map, map_dimensions, player_location);
 
@@ -889,9 +825,8 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"#;
 
         // insert a 2nd box right before the first one
         let mut game_map = original_game_map.clone();
-        game_map.remove(&IVec2::new(12, 4));
-        game_map.remove(&IVec2::new(13, 4));
-        game_map.insert(IVec2::new(12, 4), Tile::Box);
+        game_map.insert(IVec2::new(12, 4), SingleWidthTile::BoxOpen);
+        game_map.insert(IVec2::new(13, 4), SingleWidthTile::BoxClose);
 
         let actual_render_initial_state = render_map(&game_map, map_dimensions, player_location);
 
