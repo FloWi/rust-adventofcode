@@ -25,7 +25,7 @@ pub fn process_with_game_field_dimensions(
 
     let mut seconds = 0;
 
-    dbg!(&robots);
+    //dbg!(&robots);
 
     let result = loop {
         seconds += 1;

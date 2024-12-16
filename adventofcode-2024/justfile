@@ -14,7 +14,7 @@ clippy-fix day:
 bench-all:
     cargo bench -q > benchmarks.txt
 bench day part:
-    cargo bench --bench {{day}}-bench {{part}} >> {{day}}.bench.txt
+    cargo bench --bench {{day}}-bench >> {{day}}.bench.txt
 
 # create the directory for a new day's puzzle and fetch the input
 create day:

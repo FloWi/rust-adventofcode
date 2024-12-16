@@ -29,7 +29,7 @@ pub fn process_with_game_field_dimensions(
 
     let seconds = 100;
 
-    dbg!(&robots);
+    // dbg!(&robots);
 
     let quadrant_counts = robots
         .into_iter()
@@ -40,7 +40,6 @@ pub fn process_with_game_field_dimensions(
                 final_pos.y.rem_euclid(height),
             )
         })
-        .inspect(|final_pos| println!("{final_pos}"))
         .filter_map(|pos| {
             let not_on_median = pos.x != median_width && pos.y != median_height;
 
@@ -62,7 +61,7 @@ pub fn process_with_game_field_dimensions(
         })
         .counts();
 
-    dbg!(&quadrant_counts);
+    //dbg!(&quadrant_counts);
 
     let result = quadrant_counts.values().product::<usize>();
 
