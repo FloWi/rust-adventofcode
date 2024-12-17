@@ -9,12 +9,11 @@ use nom::sequence::{preceded, separated_pair, tuple};
 use nom::IResult;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::ops::BitXor;
+use tracing::{debug, info};
 
-#[tracing::instrument]
+#[tracing::instrument(skip(input))]
 pub fn process(input: &str) -> miette::Result<String> {
-    let (_, mut computer) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
-
-    dbg!(&computer);
+    let (_, mut computer) = parse(input.trim()).map_err(|e| miette!("parse failed {}", e))?;
 
     computer.run();
     let output = computer
@@ -130,11 +129,15 @@ enum OperandType {
 }
 
 impl Computer {
+    #[tracing::instrument(skip(self))]
     pub(crate) fn run(&mut self) {
         while self.instruction_pointer < self.program.len() {
-            self.run_one()
+            info!("running program at idx {}", self.instruction_pointer);
+            self.run_one();
         }
+        info!("done. Final State: \n{self:?}");
     }
+    #[tracing::instrument(skip(self))]
     pub(crate) fn run_one(&mut self) {
         let instruction = self.current_instruction();
         let op_code: u32 = instruction.into();
@@ -153,7 +156,16 @@ impl Computer {
             OperandType::Ignored => None,
         };
 
-        dbg!(instruction, operand, operand_type, resolved_operand);
+        debug!(
+            r"
+instruction_pointer: {}
+instruction: {instruction:?}
+op_code: {op_code}
+operand: {operand}
+operand_type: {operand_type:?}
+resolved_operand: {resolved_operand:?}",
+            self.instruction_pointer
+        );
 
         match instruction {
             Instruction::Adv => {
@@ -207,9 +219,9 @@ impl Computer {
         Instruction::try_from(self.program[self.instruction_pointer]).unwrap()
     }
     pub(crate) fn current_operand(&self) -> u32 {
-        let operand = self.program[self.instruction_pointer + 1];
+        
 
-        operand
+        self.program[self.instruction_pointer + 1]
     }
 
     // The computer knows eight instructions, each identified by a 3-bit number (called the instruction's opcode).
