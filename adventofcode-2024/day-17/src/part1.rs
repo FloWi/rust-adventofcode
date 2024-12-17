@@ -209,11 +209,11 @@ impl Computer {
                 self.instruction_pointer += 2;
             }
             Instruction::Out => {
-                self.output.push(resolved_operand.unwrap() % 8);
+                let resolved = resolved_operand.unwrap();
+                let result = resolved % 8;
+                self.output.push(result);
                 debug!(
-                    "Performing Out: resolved_operand % 8 = {} % 8 = {}",
-                    resolved_operand.unwrap(),
-                    self.output.last().unwrap()
+                    "Performing Out: (operand: {operand}; type: {operand_type:?}, resolved: {resolved}) ==> resolved % 8 = {resolved} % 8 = {result}",
                 );
                 self.instruction_pointer += 2;
             }
