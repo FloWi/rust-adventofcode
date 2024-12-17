@@ -15,6 +15,8 @@ use tracing::{debug, info};
 pub fn process(input: &str) -> miette::Result<String> {
     let (_, mut computer) = parse(input.trim()).map_err(|e| miette!("parse failed {}", e))?;
 
+    info!("Input: \n{input}\n\nInitial_state: \n{computer:?}");
+
     computer.run();
     let output = computer
         .output
@@ -23,6 +25,7 @@ pub fn process(input: &str) -> miette::Result<String> {
         .collect_vec()
         .join(",");
 
+    info!("Output: {}", output);
     Ok(output)
 }
 
@@ -129,15 +132,14 @@ enum OperandType {
 }
 
 impl Computer {
-    #[tracing::instrument(skip(self))]
     pub(crate) fn run(&mut self) {
         while self.instruction_pointer < self.program.len() {
-            info!("running program at idx {}", self.instruction_pointer);
+            //info!("running program at idx {}", self.instruction_pointer);
             self.run_one();
         }
         info!("done. Final State: \n{self:?}");
     }
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self), fields(instruction_pointer = self.instruction_pointer))]
     pub(crate) fn run_one(&mut self) {
         let instruction = self.current_instruction();
         let op_code: u32 = instruction.into();
@@ -156,60 +158,87 @@ impl Computer {
             OperandType::Ignored => None,
         };
 
-        debug!(
-            r"
-instruction_pointer: {}
-instruction: {instruction:?}
-op_code: {op_code}
-operand: {operand}
-operand_type: {operand_type:?}
-resolved_operand: {resolved_operand:?}",
-            self.instruction_pointer
-        );
-
         match instruction {
             Instruction::Adv => {
-                let numerator = self.register_a;
-                let denominator = 2u32.pow(resolved_operand.unwrap());
+                let a = self.register_a;
+                let numerator = a;
+                let operand = resolved_operand.unwrap();
+                let denominator = 2u32.pow(operand);
 
-                self.register_a = numerator / denominator;
+                let result = numerator / denominator;
+                self.register_a = result;
+                debug!("Performing Adv: a = a / 2^resolved_operand ==>  {a} / 2^{operand} = {numerator} / {denominator} = {result}");
+
                 self.instruction_pointer += 2;
             }
             Instruction::Bxl => {
-                self.register_b = self.register_b.bitxor(resolved_operand.unwrap());
+                let b = self.register_b;
+                let operand = resolved_operand.unwrap();
+                let result = b.bitxor(operand);
+
+                self.register_b = result;
+                debug!("Performing Bxl: b = b XOR operand --> {b} xor {operand} = {result}");
+
                 self.instruction_pointer += 2;
             }
             Instruction::Bst => {
-                self.register_b = resolved_operand.unwrap() % 8;
+                let operand = resolved_operand.unwrap();
+                let result = operand % 8;
+                debug!("Performing Bst: b = operand % 8 = {operand} % 8 = {result}");
+                self.register_b = result;
                 self.instruction_pointer += 2;
             }
             Instruction::Jnz => {
-                if self.register_a == 0 {
+                let a = self.register_a;
+                if a == 0 {
+                    debug!("Performing Jnz: a == 0 - no jump");
                     self.instruction_pointer += 2;
                 } else {
-                    self.instruction_pointer = resolved_operand.unwrap() as usize;
+                    let operand = resolved_operand.unwrap() as usize;
+                    self.instruction_pointer = operand;
+                    debug!("Performing Jnz: a != 0 ==> {a} != 0 ==> jumping to operand {operand}",);
                 }
             }
             Instruction::Bxc => {
-                self.register_b = self.register_b.bitxor(self.register_c);
+                let res = self.register_b.bitxor(self.register_c);
+                debug!(
+                    "Performing Bxc: b = b XOR c --> {} xor {} = {}",
+                    self.register_b, self.register_c, res
+                );
+                self.register_b = res;
                 self.instruction_pointer += 2;
             }
             Instruction::Out => {
                 self.output.push(resolved_operand.unwrap() % 8);
+                debug!(
+                    "Performing Out: resolved_operand % 8 = {} % 8 = {}",
+                    resolved_operand.unwrap(),
+                    self.output.last().unwrap()
+                );
                 self.instruction_pointer += 2;
             }
             Instruction::Bdv => {
-                let numerator = self.register_a;
-                let denominator = 2u32.pow(resolved_operand.unwrap());
+                let a = self.register_a;
+                let numerator = a;
+                let operand = resolved_operand.unwrap();
+                let denominator = 2u32.pow(operand);
 
-                self.register_b = numerator / denominator;
+                let result = numerator / denominator;
+                self.register_b = result;
+                debug!("Performing Bdv: b = a / 2^resolved_operand ==>  {a} / 2^{operand} = {numerator} / {denominator} = {result}");
+
                 self.instruction_pointer += 2;
             }
             Instruction::Cdv => {
-                let numerator = self.register_a;
-                let denominator = 2u32.pow(resolved_operand.unwrap());
+                let a = self.register_a;
+                let numerator = a;
+                let operand = resolved_operand.unwrap();
+                let denominator = 2u32.pow(operand);
 
-                self.register_c = numerator / denominator;
+                let result = numerator / denominator;
+                self.register_c = result;
+                debug!("Performing Cdv: c = a / 2^resolved_operand ==>  {a} / 2^{operand} = {numerator} / {denominator} = {result}");
+
                 self.instruction_pointer += 2;
             }
         }
@@ -219,8 +248,6 @@ resolved_operand: {resolved_operand:?}",
         Instruction::try_from(self.program[self.instruction_pointer]).unwrap()
     }
     pub(crate) fn current_operand(&self) -> u32 {
-        
-
         self.program[self.instruction_pointer + 1]
     }
 
