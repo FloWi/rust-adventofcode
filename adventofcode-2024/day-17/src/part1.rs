@@ -7,7 +7,8 @@ use nom::combinator::all_consuming;
 use nom::multi::separated_list1;
 use nom::sequence::{preceded, separated_pair, tuple};
 use nom::IResult;
-use num_enum::{FromPrimitive, IntoPrimitive, TryFromPrimitive};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+use std::ops::BitXor;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
@@ -15,7 +16,7 @@ pub fn process(input: &str) -> miette::Result<String> {
 
     dbg!(&computer);
 
-    &computer.run();
+    computer.run();
     let output = computer
         .output
         .into_iter()
@@ -27,7 +28,7 @@ pub fn process(input: &str) -> miette::Result<String> {
 }
 
 #[derive(TryFromPrimitive, IntoPrimitive, Debug, Clone, Copy)]
-#[repr(u32)] // or u8, i32, etc. depending on your needs
+#[repr(u32)] // or u32, i32, etc. depending on your needs
 enum Instruction {
     ///The adv instruction (opcode 0) performs division. The numerator is the value in the A register.
     /// The denominator is found by raising 2 to the power of the instruction's combo operand.
@@ -104,10 +105,7 @@ fn parse(input: &str) -> IResult<&str, Computer> {
             register_a: registers[0],
             register_b: registers[1],
             register_c: registers[2],
-            program: program
-                .into_iter()
-                .map(|instruction_u32| Instruction::try_from(instruction_u32).unwrap())
-                .collect_vec(),
+            program: program.into_iter().collect_vec(),
             instruction_pointer: 0,
             output: vec![],
         },
@@ -119,7 +117,7 @@ struct Computer {
     register_a: u32,
     register_b: u32,
     register_c: u32,
-    program: Vec<Instruction>,
+    program: Vec<u32>,
     instruction_pointer: usize,
     output: Vec<u32>,
 }
@@ -133,21 +131,85 @@ enum OperandType {
 
 impl Computer {
     pub(crate) fn run(&mut self) {
-        self.run_one();
+        while self.instruction_pointer < self.program.len() {
+            self.run_one()
+        }
     }
     pub(crate) fn run_one(&mut self) {
         let instruction = self.current_instruction();
+        let op_code: u32 = instruction.into();
         let operand = self.current_operand();
-        let operand_type = operand.operand_type();
 
-        dbg!(instruction, operand, operand_type);
+        let operand_type = instruction.operand_type();
+        let resolved_operand = match operand_type {
+            OperandType::Combo => match operand {
+                num @ 0..=3 => Some(num),
+                4 => Some(self.register_a),
+                5 => Some(self.register_b),
+                6 => Some(self.register_c),
+                7.. => panic!("this should never happen"),
+            },
+            OperandType::Literal => Some(operand),
+            OperandType::Ignored => None,
+        };
+
+        dbg!(instruction, operand, operand_type, resolved_operand);
+
+        match instruction {
+            Instruction::Adv => {
+                let numerator = self.register_a;
+                let denominator = 2u32.pow(resolved_operand.unwrap());
+
+                self.register_a = numerator / denominator;
+                self.instruction_pointer += 2;
+            }
+            Instruction::Bxl => {
+                self.register_b = self.register_b.bitxor(resolved_operand.unwrap());
+                self.instruction_pointer += 2;
+            }
+            Instruction::Bst => {
+                self.register_b = resolved_operand.unwrap() % 8;
+                self.instruction_pointer += 2;
+            }
+            Instruction::Jnz => {
+                if self.register_a == 0 {
+                    self.instruction_pointer += 2;
+                } else {
+                    self.instruction_pointer = resolved_operand.unwrap() as usize;
+                }
+            }
+            Instruction::Bxc => {
+                self.register_b = self.register_b.bitxor(self.register_c);
+                self.instruction_pointer += 2;
+            }
+            Instruction::Out => {
+                self.output.push(resolved_operand.unwrap() % 8);
+                self.instruction_pointer += 2;
+            }
+            Instruction::Bdv => {
+                let numerator = self.register_a;
+                let denominator = 2u32.pow(resolved_operand.unwrap());
+
+                self.register_b = numerator / denominator;
+                self.instruction_pointer += 2;
+            }
+            Instruction::Cdv => {
+                let numerator = self.register_a;
+                let denominator = 2u32.pow(resolved_operand.unwrap());
+
+                self.register_c = numerator / denominator;
+                self.instruction_pointer += 2;
+            }
+        }
     }
 
     pub(crate) fn current_instruction(&self) -> Instruction {
-        self.program[self.instruction_pointer]
+        Instruction::try_from(self.program[self.instruction_pointer]).unwrap()
     }
-    pub(crate) fn current_operand(&self) -> Instruction {
-        self.program[self.instruction_pointer + 1]
+    pub(crate) fn current_operand(&self) -> u32 {
+        let operand = self.program[self.instruction_pointer + 1];
+
+        operand
     }
 
     // The computer knows eight instructions, each identified by a 3-bit number (called the instruction's opcode).
@@ -200,7 +262,7 @@ Program: 2,6
         let input = r#"
 Register A: 10
 Register B: 0
-Register C:
+Register C: 0
 
 Program: 5,0,5,1,5,4
         "#
@@ -219,7 +281,7 @@ Program: 5,0,5,1,5,4
         let input = r#"
 Register A: 2024
 Register B: 0
-Register C:
+Register C: 0
 
 Program: 0,1,5,4,3,0
         "#
@@ -239,7 +301,7 @@ Program: 0,1,5,4,3,0
         let input = r#"
 Register A: 0
 Register B: 29
-Register C:
+Register C: 0
 
 Program: 1,7
         "#
