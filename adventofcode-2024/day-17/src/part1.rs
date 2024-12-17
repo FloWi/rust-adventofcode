@@ -139,11 +139,12 @@ impl Computer {
         }
         info!("done. Final State: \n{self:?}");
     }
-    #[tracing::instrument(skip(self), fields(instruction_pointer = self.instruction_pointer))]
     pub(crate) fn run_one(&mut self) {
         let instruction = self.current_instruction();
         let op_code: u32 = instruction.into();
         let operand = self.current_operand();
+
+        let instruction_pointer = self.instruction_pointer;
 
         let operand_type = instruction.operand_type();
         let resolved_operand = match operand_type {
@@ -162,47 +163,48 @@ impl Computer {
             Instruction::Adv => {
                 let a = self.register_a;
                 let numerator = a;
-                let operand = resolved_operand.unwrap();
+                let resolved = resolved_operand.unwrap();
                 let denominator = 2u32.pow(operand);
 
                 let result = numerator / denominator;
                 self.register_a = result;
-                debug!("Performing Adv: a = a / 2^resolved_operand ==>  {a} / 2^{operand} = {numerator} / {denominator} = {result}");
+                println!("idx: {instruction_pointer}; Instruction: Adv; op_code: {op_code}; operand: {operand}; type: {operand_type:?}, resolved: {resolved}  |  a = a / 2^resolved_operand ==> {a} / 2^{operand} = {numerator} / {denominator} = {result}");
 
                 self.instruction_pointer += 2;
             }
             Instruction::Bxl => {
                 let b = self.register_b;
-                let operand = resolved_operand.unwrap();
+                let resolved = resolved_operand.unwrap();
                 let result = b.bitxor(operand);
 
                 self.register_b = result;
-                debug!("Performing Bxl: b = b XOR operand --> {b} xor {operand} = {result}");
+                println!("idx: {instruction_pointer}; Instruction: Bxl; op_code: {op_code}; operand: {operand}; type: {operand_type:?}, resolved: {resolved}  |  b = b XOR operand ==> {b} xor {operand} = {result}");
 
                 self.instruction_pointer += 2;
             }
             Instruction::Bst => {
-                let operand = resolved_operand.unwrap();
+                let resolved = resolved_operand.unwrap();
                 let result = operand % 8;
-                debug!("Performing Bst: b = operand % 8 = {operand} % 8 = {result}");
+                println!("idx: {instruction_pointer}; Instruction: Bst; op_code: {op_code}; operand: {operand}; type: {operand_type:?}, resolved: {resolved}  |  b = operand % 8 ==> {operand} % 8 = {result}");
                 self.register_b = result;
                 self.instruction_pointer += 2;
             }
             Instruction::Jnz => {
                 let a = self.register_a;
                 if a == 0 {
-                    debug!("Performing Jnz: a == 0 - no jump");
+                    println!("idx: {instruction_pointer}; Instruction: Jnz; op_code: {op_code}  |  a == 0 - no jump");
                     self.instruction_pointer += 2;
                 } else {
-                    let operand = resolved_operand.unwrap() as usize;
+                    let resolved = resolved_operand.unwrap();
+                    let operand = resolved as usize;
                     self.instruction_pointer = operand;
-                    debug!("Performing Jnz: a != 0 ==> {a} != 0 ==> jumping to operand {operand}",);
+                    println!("idx: {instruction_pointer}; Instruction: Jnz; op_code: {op_code}; operand: {operand}; type: {operand_type:?}, resolved: {resolved}  |  a != 0 ==> {a} != 0 ==> jumping to operand {operand}",);
                 }
             }
             Instruction::Bxc => {
                 let res = self.register_b.bitxor(self.register_c);
-                debug!(
-                    "Performing Bxc: b = b XOR c --> {} xor {} = {}",
+                println!(
+                    "idx: {instruction_pointer}; Instruction: Bxc; op_code: {op_code}  |  b = b XOR c ==> {} xor {} = {}",
                     self.register_b, self.register_c, res
                 );
                 self.register_b = res;
@@ -212,32 +214,32 @@ impl Computer {
                 let resolved = resolved_operand.unwrap();
                 let result = resolved % 8;
                 self.output.push(result);
-                debug!(
-                    "Performing Out: (operand: {operand}; type: {operand_type:?}, resolved: {resolved}) ==> resolved % 8 = {resolved} % 8 = {result}",
+                println!(
+                    "idx: {instruction_pointer}; Instruction: Out; op_code: {op_code}; operand: {operand}; type: {operand_type:?}, resolved: {resolved}  |  resolved % 8 = {resolved} % 8 = {result}",
                 );
                 self.instruction_pointer += 2;
             }
             Instruction::Bdv => {
                 let a = self.register_a;
                 let numerator = a;
-                let operand = resolved_operand.unwrap();
-                let denominator = 2u32.pow(operand);
+                let resolved = resolved_operand.unwrap();
+                let denominator = 2u32.pow(resolved);
 
                 let result = numerator / denominator;
                 self.register_b = result;
-                debug!("Performing Bdv: b = a / 2^resolved_operand ==>  {a} / 2^{operand} = {numerator} / {denominator} = {result}");
+                println!("idx: {instruction_pointer}; Instruction: Bdv; op_code: {op_code}; operand: {operand}; type: {operand_type:?}, resolved: {resolved}  |  b = a / 2^resolved ==> {a} / 2^{resolved} = {numerator} / {denominator} = {result}");
 
                 self.instruction_pointer += 2;
             }
             Instruction::Cdv => {
                 let a = self.register_a;
                 let numerator = a;
-                let operand = resolved_operand.unwrap();
-                let denominator = 2u32.pow(operand);
+                let resolved = resolved_operand.unwrap();
+                let denominator = 2u32.pow(resolved);
 
                 let result = numerator / denominator;
                 self.register_c = result;
-                debug!("Performing Cdv: c = a / 2^resolved_operand ==>  {a} / 2^{operand} = {numerator} / {denominator} = {result}");
+                println!("idx: {instruction_pointer}; Instruction: Cdv; operand: {resolved}; type: {operand_type:?}, resolved: {resolved}  |  c = a / 2^resolved_operand ==> {a} / 2^{resolved} = {numerator} / {denominator} = {result}");
 
                 self.instruction_pointer += 2;
             }
