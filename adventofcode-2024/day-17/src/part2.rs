@@ -1,14 +1,12 @@
 use crate::{parse, Computer};
 use itertools::Itertools;
 use miette::miette;
-use num_enum::TryFromPrimitive;
 use std::collections::HashSet;
-use std::ops::BitXor;
 use tracing::{debug, info};
 
 #[tracing::instrument(skip(input))]
 pub fn process(input: &str) -> miette::Result<String> {
-    let (_, mut computer) = parse(input.trim()).map_err(|e| miette!("parse failed {}", e))?;
+    let (_, computer) = parse(input.trim()).map_err(|e| miette!("parse failed {}", e))?;
 
     info!("Input: \n{input}\n\nInitial_state: \n{computer:?}");
 
@@ -23,7 +21,7 @@ fn find_a(computer: Computer) -> u64 {
     let mut seen = HashSet::new();
 
     let mut c = computer.clone();
-    while candidates.len() > 0 {
+    while !candidates.is_empty() {
         let candidate = candidates.remove(0);
 
         for x in 0..8 {

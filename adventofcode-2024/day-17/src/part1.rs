@@ -1,8 +1,6 @@
 use crate::parse;
 use itertools::Itertools;
 use miette::miette;
-use num_enum::TryFromPrimitive;
-use std::ops::BitXor;
 use tracing::debug;
 
 #[tracing::instrument(skip(input))]
