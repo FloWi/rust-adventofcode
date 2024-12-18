@@ -8,6 +8,7 @@ use nom::sequence::{preceded, separated_pair, tuple};
 use nom::IResult;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::ops::BitXor;
+use tracing::debug;
 
 pub mod part1;
 pub mod part2;
@@ -107,6 +108,16 @@ struct Computer {
     output: Vec<u64>,
 }
 
+impl Computer {
+    pub(crate) fn reset(&mut self) {
+        self.register_a = 0u64;
+        self.register_b = 0u64;
+        self.register_c = 0u64;
+        self.instruction_pointer = 0;
+        self.output = vec![];
+    }
+}
+
 #[derive(Debug)]
 enum OperandType {
     Combo,
@@ -126,10 +137,10 @@ enum ComboType {
 impl Computer {
     pub(crate) fn run(&mut self) {
         while self.instruction_pointer < self.program.len() {
-            //println!("running program at idx {}", self.instruction_pointer);
+            //debug!("running program at idx {}", self.instruction_pointer);
             self.run_one();
         }
-        println!("done. Final State: \n{self:?}");
+        debug!("done. Final State: \n{self:?}");
     }
     pub(crate) fn run_one(&mut self) {
         let instruction = self.current_instruction();
@@ -179,7 +190,7 @@ impl Computer {
 
                 let result = numerator / denominator;
                 self.register_a = result;
-                println!("idx: {instruction_pointer}; Instruction: Adv; {} |  a = a / 2^resolved_operand ==> {a} / 2^{operand} = {numerator} / {denominator} = {result}", describe_operand());
+                debug!("idx: {instruction_pointer}; Instruction: Adv; {} |  a = a / 2^resolved_operand ==> {a} / 2^{operand} = {numerator} / {denominator} = {result}", describe_operand());
 
                 self.instruction_pointer += 2;
             }
@@ -189,32 +200,32 @@ impl Computer {
                 let result = b.bitxor(operand);
 
                 self.register_b = result;
-                println!("idx: {instruction_pointer}; Instruction: Bxl; {} |  b = b XOR operand ==> {b} xor {operand} = {result}", describe_operand());
+                debug!("idx: {instruction_pointer}; Instruction: Bxl; {} |  b = b XOR operand ==> {b} xor {operand} = {result}", describe_operand());
 
                 self.instruction_pointer += 2;
             }
             Instruction::Bst => {
                 let resolved = resolved_operand.unwrap();
                 let result = resolved % 8;
-                println!("idx: {instruction_pointer}; Instruction: Bst; {} |  b = operand % 8 ==> {operand} % 8 = {result}", describe_operand());
+                debug!("idx: {instruction_pointer}; Instruction: Bst; {} |  b = operand % 8 ==> {operand} % 8 = {result}", describe_operand());
                 self.register_b = result;
                 self.instruction_pointer += 2;
             }
             Instruction::Jnz => {
                 let a = self.register_a;
                 if a == 0 {
-                    println!("idx: {instruction_pointer}; Instruction: Jnz; op_code: {op_code}  |  a == 0 - no jump");
+                    debug!("idx: {instruction_pointer}; Instruction: Jnz; op_code: {op_code}  |  a == 0 - no jump");
                     self.instruction_pointer += 2;
                 } else {
                     let resolved = resolved_operand.unwrap();
                     let operand = resolved as usize;
                     self.instruction_pointer = operand;
-                    println!("idx: {instruction_pointer}; Instruction: Jnz; {} |  a != 0 ==> {a} != 0 ==> jumping to operand {operand}", describe_operand());
+                    debug!("idx: {instruction_pointer}; Instruction: Jnz; {} |  a != 0 ==> {a} != 0 ==> jumping to operand {operand}", describe_operand());
                 }
             }
             Instruction::Bxc => {
                 let res = self.register_b.bitxor(self.register_c);
-                println!(
+                debug!(
                     "idx: {instruction_pointer}; Instruction: Bxc; op_code: {op_code}  |  b = b XOR c ==> {} xor {} = {}",
                     self.register_b, self.register_c, res
                 );
@@ -225,7 +236,7 @@ impl Computer {
                 let resolved = resolved_operand.unwrap();
                 let result = resolved % 8;
                 self.output.push(result);
-                println!(
+                debug!(
                     "idx: {instruction_pointer}; Instruction: Out; {} |  resolved % 8 = {resolved} % 8 = {result}", describe_operand()
                 );
                 self.instruction_pointer += 2;
@@ -238,7 +249,7 @@ impl Computer {
 
                 let result = numerator / denominator;
                 self.register_b = result;
-                println!("idx: {instruction_pointer}; Instruction: Bdv; {} |  b = a / 2^resolved ==> {a} / 2^{resolved} = {numerator} / {denominator} = {result}", describe_operand());
+                debug!("idx: {instruction_pointer}; Instruction: Bdv; {} |  b = a / 2^resolved ==> {a} / 2^{resolved} = {numerator} / {denominator} = {result}", describe_operand());
 
                 self.instruction_pointer += 2;
             }
@@ -250,7 +261,7 @@ impl Computer {
 
                 let result = numerator / denominator;
                 self.register_c = result;
-                println!("idx: {instruction_pointer}; Instruction: Cdv; {} |  c = a / 2^resolved_operand ==> {a} / 2^{resolved} = {numerator} / {denominator} = {result}", describe_operand());
+                debug!("idx: {instruction_pointer}; Instruction: Cdv; {} |  c = a / 2^resolved_operand ==> {a} / 2^{resolved} = {numerator} / {denominator} = {result}", describe_operand());
 
                 self.instruction_pointer += 2;
             }

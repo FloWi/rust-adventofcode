@@ -3,12 +3,13 @@ use itertools::Itertools;
 use miette::miette;
 use num_enum::TryFromPrimitive;
 use std::ops::BitXor;
+use tracing::debug;
 
 #[tracing::instrument(skip(input))]
 pub fn process(input: &str) -> miette::Result<String> {
     let (_, mut computer) = parse(input.trim()).map_err(|e| miette!("parse failed {}", e))?;
 
-    println!("Input: \n{input}\n\nInitial_state: \n{computer:?}");
+    debug!("Input: \n{input}\n\nInitial_state: \n{computer:?}");
 
     computer.run();
     let output = computer
@@ -18,7 +19,7 @@ pub fn process(input: &str) -> miette::Result<String> {
         .collect_vec()
         .join(",");
 
-    println!("Output: {}", output);
+    debug!("Output: {}", output);
     Ok(output)
 }
 

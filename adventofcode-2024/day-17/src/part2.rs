@@ -2,24 +2,60 @@ use crate::{parse, Computer};
 use itertools::Itertools;
 use miette::miette;
 use num_enum::TryFromPrimitive;
+use std::collections::HashSet;
 use std::ops::BitXor;
+use tracing::{debug, info};
 
 #[tracing::instrument(skip(input))]
 pub fn process(input: &str) -> miette::Result<String> {
     let (_, mut computer) = parse(input.trim()).map_err(|e| miette!("parse failed {}", e))?;
 
-    println!("Input: \n{input}\n\nInitial_state: \n{computer:?}");
+    info!("Input: \n{input}\n\nInitial_state: \n{computer:?}");
 
-    let a = find_a(&mut computer);
+    let a = find_a(computer);
 
-    println!("a: {a}");
+    info!("a: {a}");
     Ok(a.to_string())
 }
 
-fn find_a(computer: &mut Computer) -> u64 {
-    computer.run();
+fn find_a(computer: Computer) -> u64 {
+    let mut candidates: Vec<u64> = vec![0];
+    let mut seen = HashSet::new();
 
-    42
+    let mut c = computer.clone();
+    while candidates.len() > 0 {
+        let candidate = candidates.remove(0);
+
+        for x in 0..8 {
+            let a = candidate * 8 + x;
+            if seen.contains(&a) {
+                continue;
+            } else {
+                seen.insert(a);
+            }
+            debug!("find_a: a: {a}");
+
+            c.reset();
+            c.register_a = a;
+
+            c.run();
+
+            let output = c.output.clone();
+
+            if output == computer.program {
+                return a;
+            }
+            let num_digits = output.len();
+            let last_elements = &c.program[&c.program.len() - num_digits..];
+
+            if last_elements == output {
+                candidates.push(a);
+            }
+        }
+        candidates.sort();
+    }
+
+    panic!("Couldn't find solution")
 }
 
 #[cfg(test)]
@@ -38,7 +74,6 @@ Program: 0,3,5,4,3,0
         "#
         .trim();
 
-
         assert_eq!(process(input)?, "117440");
         Ok(())
     }
@@ -55,38 +90,10 @@ Program: 2,4,1,5,7,5,1,6,0,3,4,6,5,5,3,0
         "#
         .trim();
 
-
         let (_, computer) = parse(input.trim()).map_err(|e| miette!("parse failed {}", e))?;
 
-        let mut results = vec![];
-
-        let candidates = vec![
-            17113115012403,
-            17113115110707,
-            17113115141427,
-            17113115143475,
-            17113115149619,
-            17113115161907,
-        ];
-
-        for c in candidates {
-            for v in 0..8 {
-                let mut computer = computer.clone();
-                let a = c * 8 + v;
-                computer.register_a = a;
-                computer.run();
-
-                let out = computer.output;
-
-                results.push((a, out));
-            }
-        }
-
-        for (a, out) in results {
-            println!("a: {a}, a_oct: {a:o}, a_binary: {a:b}, output: {out:?}");
-        }
-
         assert_eq!(process(input)?, "136904920099226");
+
         Ok(())
     }
 }
