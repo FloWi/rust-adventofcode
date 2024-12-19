@@ -16,6 +16,7 @@ miette.workspace = true
 divan.workspace = true
 rstest.workspace = true
 test-log.workspace = true
+assert_unordered = "0.3.5"
 
 [[bench]]
 name = "day-19-bench"

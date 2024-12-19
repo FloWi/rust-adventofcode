@@ -23,7 +23,7 @@ pub fn process(_input: &str) -> miette::Result<String> {
     let result = &problem_setup
         .towels
         .iter()
-        .filter(|towel| match_towel_recurse(towel, &sorted_tokes))
+        .filter(|towel| match_towel(towel, &sorted_tokes))
         .count();
 
     Ok(result.to_string())
