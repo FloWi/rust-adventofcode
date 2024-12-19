@@ -1,21 +1,20 @@
 use glam::IVec2;
-use itertools::Itertools;
 use miette::miette;
-use std::ops::{Not, RangeInclusive};
+use std::ops::RangeInclusive;
 
 #[tracing::instrument]
 pub fn process(input: &str, grid_limit: &RangeInclusive<i32>) -> miette::Result<String> {
     let (_, byte_locations): (&str, Vec<IVec2>) =
         crate::parse(input).map_err(|e| miette!("parse failed {}", e))?;
 
-    let goal = IVec2::new(*grid_limit.end() as i32, *grid_limit.end() as i32);
+    let goal = IVec2::new(*grid_limit.end(), *grid_limit.end());
 
     let mut low = 0;
     let mut high = byte_locations.len();
 
     while low < high {
         let mid = (low + high) / 2;
-        if let Some(_) = crate::find_path(&byte_locations, &goal, mid + 1, grid_limit) {
+        if crate::find_path(&byte_locations, &goal, mid + 1, grid_limit).is_some() {
             low = mid + 1;
         } else {
             high = mid;

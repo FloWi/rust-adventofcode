@@ -1,6 +1,5 @@
 use crate::find_path;
 use glam::IVec2;
-use itertools::Itertools;
 use miette::miette;
 use nom::character::complete;
 use nom::character::complete::char;
@@ -9,7 +8,7 @@ use nom::combinator::map;
 use nom::multi::separated_list1;
 use nom::sequence::separated_pair;
 use nom::IResult;
-use std::ops::{Not, RangeInclusive};
+use std::ops::RangeInclusive;
 
 #[tracing::instrument]
 pub fn process(
@@ -19,7 +18,7 @@ pub fn process(
 ) -> miette::Result<String> {
     let (_, byte_locations) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
 
-    let goal = IVec2::new(*grid_limit.end() as i32, *grid_limit.end() as i32);
+    let goal = IVec2::new(*grid_limit.end(), *grid_limit.end());
 
     let Some((_path, cost)) = find_path(&byte_locations, &goal, num_bytes, grid_limit) else {
         panic!("No path found")
