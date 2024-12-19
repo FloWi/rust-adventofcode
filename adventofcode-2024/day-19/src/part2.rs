@@ -93,17 +93,24 @@ fn find_sub_tokens<'a>(token: &'a str, tokens: &'a [&'a str]) -> Vec<&'a str> {
     let possible_sub_tokens = tokens
         .iter()
         .filter(|sub| sub.len() < token.len())
-        .filter(|&&sub| {
-            let contains = token.contains(sub);
-            let sub_tokens = token.split(sub).collect_vec();
-            let all_sub_tokens_valid = sub_tokens
-                .iter()
-                .all(|sub| sub.is_empty() || tokens.contains(sub));
-            dbg!(token, sub, contains, sub_tokens, all_sub_tokens_valid);
-            contains && all_sub_tokens_valid
+        .filter(|&&current_sub_token| {
+            let str_contains = token.contains(current_sub_token);
+            str_contains
         })
         .cloned()
         .collect_vec();
+
+    dbg!(token, &possible_sub_tokens);
+
+    if let Some(shortest_sub_token) = &possible_sub_tokens.iter().map(|sub| sub.len()).min() {
+        let combination_size = token.len() / shortest_sub_token + 1;
+        let unique_combinations = possible_sub_tokens
+            .iter()
+            .combinations_with_replacement(combination_size)
+            .filter(|combi| combi.into_iter().join("") == token)
+            .collect_vec();
+        dbg!(unique_combinations);
+    }
 
     possible_sub_tokens.iter().unique().cloned().collect_vec()
 }
