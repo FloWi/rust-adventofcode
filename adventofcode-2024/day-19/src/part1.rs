@@ -1,40 +1,77 @@
 use itertools::Itertools;
-use nom::branch::alt;
+use miette::miette;
 use nom::bytes::complete::tag;
-use nom::combinator::all_consuming;
-use nom::multi::many0;
+use nom::character::complete::*;
+use nom::multi::separated_list1;
+use nom::sequence::separated_pair;
 use nom::IResult;
 
 #[tracing::instrument]
 pub fn process(_input: &str) -> miette::Result<String> {
-    let words = [
-        "brwrr", "bggr", "gbbr", "rrbgbr", "ubwu", "bwurrg", "brgr", "bbrgwb",
-    ];
+    let (_, problem_setup) = parser(_input).map_err(|e| miette!("parse failed {}", e))?;
 
-    let result = words
+    //dbg!(&problem_setup);
+
+    let sorted_tokes = problem_setup
+        .tokens
         .iter()
-        .filter_map(|word| parser(word).ok())
-        .map(|(_, words)| words.join(""))
-        .inspect(|res| println!("{:?}", res))
+        .sorted_by_key(|token| token.len())
+        .rev()
+        .cloned()
+        .collect_vec();
+
+    let result = &problem_setup
+        .towels
+        .iter()
+        .filter(|towel| match_towel_recurse(towel, &sorted_tokes))
         .count();
 
     Ok(result.to_string())
 }
 
-fn parser(word: &str) -> IResult<&str, Vec<&str>> {
-    all_consuming(many0(alt((
-        tag("bwu"),
-        tag("wr"),
-        tag("rb"),
-        tag("gb"),
-        tag("br"),
-        tag("r"),
-        tag("b"),
-        tag("g"),
-    ))))(word)
+#[derive(Debug)]
+struct ProblemSetup<'a> {
+    tokens: Vec<&'a str>,
+    towels: Vec<&'a str>,
 }
 
-fn parse_towels() {}
+#[tracing::instrument]
+fn match_towel(towel: &str, tokens: &Vec<&str>) -> bool {
+    match_towel_recurse(towel, tokens)
+}
+
+#[tracing::instrument]
+fn match_towel_recurse(towel: &str, tokens: &Vec<&str>) -> bool {
+    if towel.is_empty() {
+        return true;
+    }
+    let matching_tokens = tokens
+        .iter()
+        .filter(|token| towel.starts_with(**token))
+        .collect_vec();
+
+    if matching_tokens.is_empty() {
+        return false;
+    }
+
+    for token in matching_tokens {
+        let sub_string = &towel[token.len()..];
+        if match_towel_recurse(sub_string, tokens) {
+            return true;
+        }
+    }
+    false
+}
+
+fn parser(input: &str) -> IResult<&str, ProblemSetup> {
+    let (rest, (tokens, towels)) = separated_pair(
+        separated_list1(tag(", "), alpha1),
+        multispace1,
+        separated_list1(multispace1, alpha1),
+    )(input.trim())?;
+
+    Ok((rest, ProblemSetup { tokens, towels }))
+}
 
 #[cfg(test)]
 mod tests {
