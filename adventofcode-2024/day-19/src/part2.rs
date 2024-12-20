@@ -1,9 +1,10 @@
 use cached::proc_macro::cached;
+use cached::Cached;
 use itertools::Itertools;
 use miette::miette;
 use nom::IResult;
+use tracing::{debug, info};
 
-#[tracing::instrument]
 pub fn process(_input: &str) -> miette::Result<String> {
     let (_, problem_setup) = parser(_input).map_err(|e| miette!("parse failed {}", e))?;
 
@@ -23,7 +24,20 @@ pub fn process(_input: &str) -> miette::Result<String> {
         .filter_map(|towel| match_towel_recurse(towel, &sorted_tokes))
         .sum::<u64>();
 
+    {
+        use cached::Cached;
+
+        let mut cache = MATCH_TOWEL_RECURSE.lock().unwrap();
+
+        info!("[cached] size {:?}", cache.cache_size());
+        info!("[cached] hits {:?}", cache.cache_hits().unwrap_or(0));
+        info!("[cached] misses {:?}", cache.cache_misses().unwrap_or(0));
+        cache.cache_clear();
+        info!("Cleared cache");
+
+    }
     Ok(result.to_string())
+
 }
 
 #[derive(Debug)]
@@ -32,7 +46,6 @@ struct ProblemSetup<'a> {
     towels: Vec<&'a str>,
 }
 #[cached(key = "String", convert = r##"{ format!("{towel}") }"##)]
-#[tracing::instrument]
 fn match_towel_recurse(towel: &str, tokens: &Vec<&str>) -> Option<u64> {
     if towel.is_empty() {
         return Some(1);
