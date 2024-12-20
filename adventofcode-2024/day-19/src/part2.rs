@@ -1,9 +1,6 @@
+use cached::proc_macro::cached;
 use itertools::Itertools;
 use miette::miette;
-use nom::bytes::complete::tag;
-use nom::character::complete::*;
-use nom::multi::separated_list1;
-use nom::sequence::separated_pair;
 use nom::IResult;
 
 #[tracing::instrument]
@@ -20,11 +17,11 @@ pub fn process(_input: &str) -> miette::Result<String> {
         .cloned()
         .collect_vec();
 
-    let result = &problem_setup
+    let result = problem_setup
         .towels
         .iter()
-        .filter(|towel| match_towel(towel, &sorted_tokes))
-        .count();
+        .filter_map(|towel| match_towel_recurse(towel, &sorted_tokes))
+        .sum::<u64>();
 
     Ok(result.to_string())
 }
@@ -34,26 +31,11 @@ struct ProblemSetup<'a> {
     tokens: Vec<&'a str>,
     towels: Vec<&'a str>,
 }
-
+#[cached(key = "String", convert = r##"{ format!("{towel}") }"##)]
 #[tracing::instrument]
-fn match_towel(towel: &str, tokens: &Vec<&str>) -> bool {
-    if let Some(tokens) = match_towel_recurse(towel, tokens, Vec::new()) {
-        println!("Found match for towel '{towel}'");
-        println!("  matching tokens: '{tokens:?}'");
-        true
-    } else {
-        false
-    }
-}
-
-#[tracing::instrument]
-fn match_towel_recurse(
-    towel: &str,
-    tokens: &Vec<&str>,
-    tokens_used: Vec<String>,
-) -> Option<Vec<String>> {
+fn match_towel_recurse(towel: &str, tokens: &Vec<&str>) -> Option<u64> {
     if towel.is_empty() {
-        return Some(tokens_used.clone());
+        return Some(1);
     }
     let matching_tokens = tokens
         .iter()
@@ -64,22 +46,23 @@ fn match_towel_recurse(
         return None;
     }
 
-    for token in matching_tokens {
-        let sub_string = &towel[token.len()..];
-        let my_token_vec: Vec<String> = vec![(*token).to_string()];
-        let new_tokens_used: Vec<String> = tokens_used
-            .iter()
-            .cloned()
-            .chain(my_token_vec.into_iter())
-            .collect_vec();
-        if let Some(tokens_used) = match_towel_recurse(sub_string, tokens, new_tokens_used) {
-            return Some(tokens_used);
-        }
-    }
-    None
+    Some(
+        matching_tokens
+            .into_iter()
+            .filter_map(|token| {
+                let sub_string = &towel[token.len()..];
+                match_towel_recurse(sub_string, tokens)
+            })
+            .sum(),
+    )
 }
 
 fn parser(input: &str) -> IResult<&str, ProblemSetup> {
+    use nom::bytes::complete::tag;
+    use nom::character::complete::*;
+    use nom::multi::separated_list1;
+    use nom::sequence::separated_pair;
+
     let (rest, (tokens, towels)) = separated_pair(
         separated_list1(tag(", "), alpha1),
         multispace1,
@@ -89,36 +72,9 @@ fn parser(input: &str) -> IResult<&str, ProblemSetup> {
     Ok((rest, ProblemSetup { tokens, towels }))
 }
 
-fn find_sub_tokens<'a>(token: &'a str, tokens: &'a [&'a str]) -> Vec<&'a str> {
-    let possible_sub_tokens = tokens
-        .iter()
-        .filter(|sub| sub.len() < token.len())
-        .filter(|&&current_sub_token| {
-            let str_contains = token.contains(current_sub_token);
-            str_contains
-        })
-        .cloned()
-        .collect_vec();
-
-    dbg!(token, &possible_sub_tokens);
-
-    if let Some(shortest_sub_token) = &possible_sub_tokens.iter().map(|sub| sub.len()).min() {
-        let combination_size = token.len() / shortest_sub_token + 1;
-        let unique_combinations = possible_sub_tokens
-            .iter()
-            .combinations_with_replacement(combination_size)
-            .filter(|combi| combi.into_iter().join("") == token)
-            .collect_vec();
-        dbg!(unique_combinations);
-    }
-
-    possible_sub_tokens.iter().unique().cloned().collect_vec()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_unordered::assert_eq_unordered;
 
     #[test]
     fn test_process() -> miette::Result<()> {
@@ -137,26 +93,5 @@ bbrgwb
         .trim();
         assert_eq!("16", process(input)?);
         Ok(())
-    }
-
-    #[test]
-    fn test_find_sub_tokens() {
-        let tokens = vec!["r", "wr", "b", "g", "bwu", "rb", "gb", "br"];
-        assert_eq_unordered!(find_sub_tokens("br", &tokens), vec!["r", "b"]);
-    }
-
-    #[test]
-    fn test_find_sub_tokens_1() {
-        let tokens = vec!["r", "b", "rb", "bg"];
-        assert_eq_unordered!(find_sub_tokens("rbg", &tokens), vec!["r", "bg"]);
-    }
-
-    #[test]
-    fn test_find_sub_tokens_broken_down() {
-        let tokens = vec!["r", "b", "g", "rbgb", "rb", "gb"];
-        assert_eq_unordered!(
-            find_sub_tokens("rbgb", &tokens),
-            vec!["r", "b", "g", "rb", "gb"]
-        );
     }
 }
