@@ -1,10 +1,6 @@
+use crate::parser;
 use itertools::Itertools;
 use miette::miette;
-use nom::bytes::complete::tag;
-use nom::character::complete::*;
-use nom::multi::separated_list1;
-use nom::sequence::separated_pair;
-use nom::IResult;
 
 #[tracing::instrument]
 pub fn process(_input: &str) -> miette::Result<String> {
@@ -27,12 +23,6 @@ pub fn process(_input: &str) -> miette::Result<String> {
         .count();
 
     Ok(result.to_string())
-}
-
-#[derive(Debug)]
-struct ProblemSetup<'a> {
-    tokens: Vec<&'a str>,
-    towels: Vec<&'a str>,
 }
 
 #[tracing::instrument]
@@ -61,16 +51,6 @@ fn match_towel_recurse(towel: &str, tokens: &Vec<&str>) -> bool {
         }
     }
     false
-}
-
-fn parser(input: &str) -> IResult<&str, ProblemSetup> {
-    let (rest, (tokens, towels)) = separated_pair(
-        separated_list1(tag(", "), alpha1),
-        multispace1,
-        separated_list1(multispace1, alpha1),
-    )(input.trim())?;
-
-    Ok((rest, ProblemSetup { tokens, towels }))
 }
 
 #[cfg(test)]

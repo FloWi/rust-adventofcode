@@ -1,9 +1,9 @@
+use crate::parser;
 use cached::proc_macro::cached;
 use cached::Cached;
 use itertools::Itertools;
 use miette::miette;
-use nom::IResult;
-use tracing::{debug, info};
+use tracing::info;
 
 pub fn process(_input: &str) -> miette::Result<String> {
     let (_, problem_setup) = parser(_input).map_err(|e| miette!("parse failed {}", e))?;
@@ -34,17 +34,10 @@ pub fn process(_input: &str) -> miette::Result<String> {
         info!("[cached] misses {:?}", cache.cache_misses().unwrap_or(0));
         cache.cache_clear();
         info!("Cleared cache");
-
     }
     Ok(result.to_string())
-
 }
 
-#[derive(Debug)]
-struct ProblemSetup<'a> {
-    tokens: Vec<&'a str>,
-    towels: Vec<&'a str>,
-}
 #[cached(key = "String", convert = r##"{ format!("{towel}") }"##)]
 fn match_towel_recurse(towel: &str, tokens: &Vec<&str>) -> Option<u64> {
     if towel.is_empty() {
@@ -68,21 +61,6 @@ fn match_towel_recurse(towel: &str, tokens: &Vec<&str>) -> Option<u64> {
             })
             .sum(),
     )
-}
-
-fn parser(input: &str) -> IResult<&str, ProblemSetup> {
-    use nom::bytes::complete::tag;
-    use nom::character::complete::*;
-    use nom::multi::separated_list1;
-    use nom::sequence::separated_pair;
-
-    let (rest, (tokens, towels)) = separated_pair(
-        separated_list1(tag(", "), alpha1),
-        multispace1,
-        separated_list1(multispace1, alpha1),
-    )(input.trim())?;
-
-    Ok((rest, ProblemSetup { tokens, towels }))
 }
 
 #[cfg(test)]
