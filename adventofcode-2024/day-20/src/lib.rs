@@ -41,7 +41,7 @@ pub struct Racetrack {
 fn parse(input: &str) -> Racetrack {
     #[derive(Debug)]
     enum ParsedTile {
-        Empty(IVec2),
+        Empty,
         Wall(IVec2),
         Start(IVec2),
         End(IVec2),
@@ -56,7 +56,7 @@ fn parse(input: &str) -> Racetrack {
                 match char {
                     'S' => ParsedTile::Start(loc),
                     'E' => ParsedTile::End(loc),
-                    '.' => ParsedTile::Empty(loc),
+                    '.' => ParsedTile::Empty,
                     '#' => ParsedTile::Wall(loc),
                     tile => panic!("can't parse tile '{tile}'"),
                 }
@@ -67,7 +67,7 @@ fn parse(input: &str) -> Racetrack {
     let (start, end, walls) = parsed_tiles.iter().fold(
         (None, None, HashSet::new()),
         |(start, end, mut walls), tile| match tile {
-            ParsedTile::Empty(_) => (start, end, walls),
+            ParsedTile::Empty => (start, end, walls),
             ParsedTile::Wall(pos) => {
                 walls.insert(*pos);
                 (start, end, walls)

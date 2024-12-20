@@ -1,6 +1,5 @@
 use crate::parser;
 use cached::proc_macro::cached;
-use cached::Cached;
 use itertools::Itertools;
 use miette::miette;
 use tracing::info;
