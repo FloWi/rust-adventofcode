@@ -1,9 +1,8 @@
 use crate::parser;
-use cached::proc_macro::cached;
 use cached::Cached;
 use itertools::Itertools;
 use miette::miette;
-use tracing::info;
+use std::collections::HashMap;
 
 pub fn process(_input: &str) -> miette::Result<String> {
     let (_, problem_setup) = parser(_input).map_err(|e| miette!("parse failed {}", e))?;
@@ -18,30 +17,27 @@ pub fn process(_input: &str) -> miette::Result<String> {
         .cloned()
         .collect_vec();
 
+    let mut cache: HashMap<&str, u64> = HashMap::new();
+
     let result = problem_setup
         .towels
         .iter()
-        .filter_map(|towel| match_towel_recurse(towel, &sorted_tokes))
+        .filter_map(|towel| match_towel_recurse(towel, &sorted_tokes, &mut cache))
         .sum::<u64>();
 
-    {
-        use cached::Cached;
-
-        let mut cache = MATCH_TOWEL_RECURSE.lock().unwrap();
-
-        info!("[cached] size {:?}", cache.cache_size());
-        info!("[cached] hits {:?}", cache.cache_hits().unwrap_or(0));
-        info!("[cached] misses {:?}", cache.cache_misses().unwrap_or(0));
-        cache.cache_clear();
-        info!("Cleared cache");
-    }
     Ok(result.to_string())
 }
 
-#[cached(key = "String", convert = r##"{ format!("{towel}") }"##)]
-fn match_towel_recurse(towel: &str, tokens: &Vec<&str>) -> Option<u64> {
+fn match_towel_recurse<'a>(
+    towel: &'a str,
+    tokens: &Vec<&str>,
+    cache: &mut HashMap<&'a str, u64>,
+) -> Option<u64> {
     if towel.is_empty() {
         return Some(1);
+    }
+    if let Some(cached_entry) = cache.get(towel) {
+        return Some(*cached_entry);
     }
     let matching_tokens = tokens
         .iter()
@@ -49,18 +45,20 @@ fn match_towel_recurse(towel: &str, tokens: &Vec<&str>) -> Option<u64> {
         .collect_vec();
 
     if matching_tokens.is_empty() {
+        cache.insert(towel, 0);
         return None;
     }
 
-    Some(
-        matching_tokens
-            .into_iter()
-            .filter_map(|token| {
-                let sub_string = &towel[token.len()..];
-                match_towel_recurse(sub_string, tokens)
-            })
-            .sum(),
-    )
+    let result = matching_tokens
+        .into_iter()
+        .filter_map(|token| {
+            let sub_string = &towel[token.len()..];
+            match_towel_recurse(sub_string, tokens, cache)
+        })
+        .sum();
+
+    cache.insert(towel, result);
+    Some(result)
 }
 
 #[cfg(test)]
