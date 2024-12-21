@@ -9,8 +9,6 @@ pub fn process(input: &str, min_savings_limit: u32) -> miette::Result<String> {
     let (path, cost) =
         find_path(&racetrack.walls, &racetrack.start, &racetrack.end).expect("path to be found");
 
-    println!("Found path of length {}", cost);
-
     let result = find_number_of_cheats(path, cost, min_savings_limit);
 
     Ok(result.to_string())
@@ -56,7 +54,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "Testcase seems to be wrong - but algorithm creates the correct answer for part 2. So hey - let's take the win and move on"]
     fn test_process() -> miette::Result<()> {
         let input = r#"
 ###############
@@ -88,9 +85,13 @@ mod tests {
         // There are 12 cheats that save 66 picoseconds.
         // There are 14 cheats that save 68 picoseconds.
         // There are 12 cheats that save 70 picoseconds.
+        // There are 22 cheats that save 72 picoseconds.
+        // There are 4 cheats that save 74 picoseconds.
+        // There are 3 cheats that save 76 picoseconds.
 
-        let expected_number_of_cheats: i32 =
-            [32, 31, 29, 39, 25, 23, 20, 19, 12, 14, 12].iter().sum();
+        let expected_number_of_cheats: i32 = [32, 31, 29, 39, 25, 23, 20, 19, 12, 14, 12, 22, 4, 3]
+            .iter()
+            .sum();
 
         // I thought this was a valid testcase. My solution created the correct answer for part 2 but not for this testcase.
         assert_eq!(expected_number_of_cheats.to_string(), process(input, 50)?);
