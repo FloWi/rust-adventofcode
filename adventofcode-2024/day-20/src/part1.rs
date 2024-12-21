@@ -10,8 +10,6 @@ pub fn process(input: &str, min_savings_limit: Option<u32>) -> miette::Result<St
     let (path, cost) =
         find_path(&racetrack.walls, &racetrack.start, &racetrack.end).expect("path to be found");
 
-    println!("Found path of length {}", cost);
-
     let savings_map = find_number_of_cheats(path, &racetrack);
 
     let relevant_entries = match min_savings_limit {
@@ -65,7 +63,6 @@ fn find_number_of_cheats(path: Vec<IVec2>, racetrack: &Racetrack) -> HashMap<i32
         }
     }
 
-    println!("savings_map \n{savings_map:?}",);
     savings_map
 }
 
