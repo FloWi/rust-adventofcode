@@ -26,3 +26,4 @@ thiserror = "2.0.3"
 pathfinding = "4.11.0"
 cached = "0.54.0"
 
+assert_unordered = "0.3.5"
