@@ -1,11 +1,45 @@
+use crate::{DIRECTION_KEY_MAP, NUMERIC_KEY_MAP};
 use glam::IVec2;
 use itertools::Itertools;
 use pathfinding::prelude::astar_bag;
 use std::collections::HashMap;
 
 #[tracing::instrument]
-pub fn process(_input: &str) -> miette::Result<String> {
-    todo!("day 01 - part 1");
+pub fn process(input: &str) -> miette::Result<String> {
+    let codes = input.trim().lines().collect_vec();
+
+    let complexities = codes
+        .iter()
+        .cloned()
+        .map(|code| compute_complexity_part_1(code))
+        .collect_vec();
+
+    let result: usize = complexities.iter().sum();
+
+    Ok(result.to_string())
+}
+
+fn compute_complexity_part_1(input_code: &str) -> usize {
+    let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+    let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+    let actual_sequences =
+        compute_all_sequences_for_two_robots(input_code, &numeric_key_map, &directional_key_map);
+
+    let final_sequences = actual_sequences
+        .into_iter()
+        .flat_map(|seq| compute_all_sequences_for_robot(&seq, &directional_key_map))
+        .collect_vec();
+
+    let shortest_length = final_sequences.iter().map(|seq| seq.len()).min().unwrap();
+
+    let numeric_part_of_code = input_code
+        .strip_suffix("A")
+        .unwrap()
+        .parse::<usize>()
+        .unwrap();
+    let complexity = shortest_length * numeric_part_of_code;
+
+    complexity
 }
 
 struct KeyMap {
@@ -94,17 +128,44 @@ fn compute_all_sequences_for_robot(input: &str, key_map: &KeyMap) -> Vec<String>
     ]
              */
 
-    dbg!(sequences);
-    dbg!(&all_possible_sequences);
+    let shortest_length = all_possible_sequences
+        .iter()
+        .map(|seq| seq.len())
+        .min()
+        .unwrap();
+    assert!(
+        all_possible_sequences
+            .iter()
+            .all(|seq| seq.len() == shortest_length),
+        "all sequences must have the same length"
+    );
 
     all_possible_sequences
+}
+
+fn compute_all_sequences_for_two_robots(
+    input: &str,
+    key_map_1: &KeyMap,
+    key_map_2: &KeyMap,
+) -> Vec<String> {
+    let robot_1_sequences = compute_all_sequences_for_robot(input, key_map_1);
+    let robot_2_sequences = robot_1_sequences
+        .iter()
+        .flat_map(|sequence_robot_1| compute_all_sequences_for_robot(sequence_robot_1, key_map_2))
+        .collect_vec();
+
+    let shortest_length = robot_2_sequences.iter().map(|seq| seq.len()).min().unwrap();
+    robot_2_sequences
+        .into_iter()
+        .filter(|seq| seq.len() == shortest_length)
+        .collect_vec()
 }
 
 fn compute_optimal_moves_for_robot(from: char, to: char, key_map: &KeyMap) -> Vec<String> {
     let start: IVec2 = key_map.char_to_loc[&from];
     let destination: IVec2 = key_map.char_to_loc[&to];
 
-    let (sequences, cost) = astar_bag(
+    let (sequences, _cost) = astar_bag(
         &start,
         |pos| {
             NEIGHBOR_DIRECTIONS
@@ -147,7 +208,7 @@ fn compute_optimal_moves_for_robot(from: char, to: char, key_map: &KeyMap) -> Ve
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::NUMERIC_KEY_MAP;
+    use crate::{DIRECTION_KEY_MAP, NUMERIC_KEY_MAP};
     use assert_unordered::assert_eq_unordered;
     use itertools::Itertools;
     use rstest::rstest;
@@ -163,6 +224,12 @@ mod tests {
         "#
         .trim();
         assert_eq!("126384", process(input)?);
+        Ok(())
+    }
+
+    #[test]
+    fn test_complexity_first_input() -> miette::Result<()> {
+        assert_eq!(compute_complexity_part_1("029A"), 1972);
         Ok(())
     }
 
@@ -195,8 +262,6 @@ mod tests {
         #[case] input: &str,
         #[case] one_example_sequence: &str,
     ) -> miette::Result<()> {
-        todo!();
-
         Ok(())
     }
 
@@ -213,6 +278,36 @@ mod tests {
             compute_all_sequences_for_robot("029A", &numeric_key_map);
 
         assert_eq_unordered!(actual_sequences, expected_optimal_sequences)
+    }
+
+    #[test]
+    fn first_two_robot_moves() {
+        let input = "029A";
+        let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+        let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+        let one_optimal_sequence = "v<<A>>^A<A>AvA<^AA>A<vAAA>^A".to_string();
+        let actual_sequences =
+            compute_all_sequences_for_two_robots(input, &numeric_key_map, &directional_key_map);
+
+        assert!(actual_sequences.contains(&one_optimal_sequence));
+    }
+
+    #[test]
+    fn all_three_robot_moves() {
+        let input = "029A";
+        let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+        let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+        let one_optimal_sequence = "v<<A>>^A<A>AvA<^AA>A<vAAA>^A".to_string();
+        let actual_sequences =
+            compute_all_sequences_for_two_robots(input, &numeric_key_map, &directional_key_map);
+
+        assert!(actual_sequences.contains(&one_optimal_sequence));
+        let final_sequences =
+            compute_all_sequences_for_robot(&one_optimal_sequence, &directional_key_map);
+
+        let expected_final_sequence_example =
+            "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A".to_string();
+        assert!(final_sequences.contains(&expected_final_sequence_example));
     }
 
     #[rstest]
