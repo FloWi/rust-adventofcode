@@ -26,12 +26,78 @@ impl KeyMap {
     }
 }
 
-fn compute_optimal_sequences_for_robot<'a>(input: &'a str, key_map: &KeyMap) -> Vec<&'a str> {
-    let start = key_map.char_to_loc[&'A'];
-    let start = key_map.char_to_loc[&'A'];
+/*
+There are many shortest possible sequences of directional keypad button presses that would
+cause this robot
+to tell the second robot
+to tell the first robot
+to eventually type 029A on the door.
 
-    //dijkstra_all(start)
-    todo!()
+One such sequence is <vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A.
+
+In summary, there are the following keypads:
+
+One directional keypad that you are using.
+Two directional keypads that robots are using.
+One numeric keypad (on a door) that a robot is using.
+
+
+<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A
+v<<A>>^A<A>AvA<^AA>A<vAAA>^A
+<A^A>^^AvvvA
+029A
+
+ */
+
+fn compute_all_sequences_for_robot(input: &str, key_map: &KeyMap) -> Vec<String> {
+    // robot arm starts on A
+    let sequences = ("A".to_owned() + input)
+        .chars()
+        .tuple_windows()
+        .map(|(from, to)| {
+            compute_optimal_moves_for_robot(from, to, key_map)
+                .into_iter()
+                .map(|movement_sequence| movement_sequence + "A")
+                .collect_vec()
+        })
+        .collect_vec();
+
+    let all_possible_sequences = sequences
+        .iter()
+        .cloned()
+        .multi_cartesian_product()
+        .map(|combo| combo.join(""))
+        .collect_vec();
+
+    /*
+    [day-21/src/part1.rs:64:5] sequences = [
+        [
+            "<A",
+        ],
+        [
+            "^A",
+        ],
+        [
+            "^^>A",
+            ">^^A",
+            "^>^A",
+        ],
+        [
+            "vvvA",
+        ],
+    ]
+
+    [day-21/src/part1.rs:85:5] all_possible_sequences = [
+    "<A^A^>^AvvvA",
+    "<A^A>^^AvvvA",
+    "<A^A^^>AvvvA",
+    ]
+             */
+
+    dbg!(sequences);
+    dbg!(&all_possible_sequences);
+
+    all_possible_sequences
 }
 
 fn compute_optimal_moves_for_robot(from: char, to: char, key_map: &KeyMap) -> Vec<String> {
@@ -127,9 +193,9 @@ mod tests {
     )]
     fn test_shortest_sequence(
         #[case] input: &str,
-        #[case] example_sequence: &str,
+        #[case] one_example_sequence: &str,
     ) -> miette::Result<()> {
-        assert_eq!(input.len(), example_sequence.len());
+        todo!();
 
         Ok(())
     }
@@ -138,10 +204,13 @@ mod tests {
     fn first_robot_moves() {
         let input = "029A";
         let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
-        let expected_optimal_sequences = vec!["<A^A>^^AvvvA", "<A^A^>^AvvvA", "<A^A^^>AvvvA"];
+        let expected_optimal_sequences = vec!["<A^A>^^AvvvA", "<A^A^>^AvvvA", "<A^A^^>AvvvA"]
+            .into_iter()
+            .map(|string| string.to_string())
+            .collect_vec();
 
-        let actual_sequences: Vec<&str> =
-            compute_optimal_sequences_for_robot("029A", &numeric_key_map);
+        let actual_sequences: Vec<String> =
+            compute_all_sequences_for_robot("029A", &numeric_key_map);
 
         assert_eq_unordered!(actual_sequences, expected_optimal_sequences)
     }
@@ -172,15 +241,6 @@ mod tests {
             .split(", ")
             .map(|sub| sub.to_string())
             .collect_vec();
-
-        /*
-
-        8
-
-
-
-        9
-             */
 
         assert_eq_unordered!(
             compute_optimal_moves_for_robot(from, to, &numeric_key_map),
