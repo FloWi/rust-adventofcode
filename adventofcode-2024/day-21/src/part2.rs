@@ -2,6 +2,7 @@ use crate::{DIRECTION_KEY_MAP, NUMERIC_KEY_MAP};
 use glam::IVec2;
 use itertools::Itertools;
 use pathfinding::prelude::astar_bag;
+use std::cmp::max;
 use std::collections::HashMap;
 use tracing::info;
 
@@ -230,6 +231,7 @@ mod tests {
     use crate::{DIRECTION_KEY_MAP, NUMERIC_KEY_MAP};
     use assert_unordered::assert_eq_unordered;
     use itertools::Itertools;
+    use nom::Parser;
     use rstest::rstest;
 
     #[test]
@@ -337,5 +339,119 @@ mod tests {
             compute_optimal_moves_for_robot(from, to, &numeric_key_map, 1, &mut call_map),
             expected
         );
+    }
+
+    #[test]
+    fn refactoring_to_dfs() {
+        let test_code = "029A";
+
+        compute_number_of_sequences_improved(test_code, 2);
+    }
+}
+
+fn compute_number_of_sequences_improved(input: &str, number_of_numeric_keypads: u32) {
+    let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+    let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+
+    let mut cache = HashMap::new();
+
+    format!("A{input}")
+        .chars()
+        .tuple_windows()
+        .for_each(|(from, to)| {
+            let result = compute_number_of_sequences_recursive(
+                from,
+                to,
+                0,
+                number_of_numeric_keypads,
+                &numeric_key_map,
+                &directional_key_map,
+                &mut cache,
+            );
+            dbg!(result);
+        });
+
+    println!("Cache overview: ");
+    cache
+        .into_iter()
+        .sorted_by_key(|((_, _, level), _)| *level)
+        .for_each(|((from, to, level), count)| {
+            println!("Level {level}: {from}{to} = {count}");
+        });
+
+    println!("")
+    // dbg!(cache);
+}
+
+fn compute_number_of_sequences_recursive(
+    from: char,
+    to: char,
+    level: u32,
+    max_level: u32,
+    numeric_keypad: &KeyMap,
+    directional_keypad: &KeyMap,
+    cache: &mut HashMap<(char, char, u32), usize>,
+) -> usize {
+    match cache.get(&(from, to, level)) {
+        Some(&result) => result,
+        None => {
+            let result = (level..=max_level)
+                .map(|current_level| {
+                    let keypad = match level {
+                        0 => numeric_keypad,
+                        n if (1..=max_level).contains(&n) => directional_keypad,
+                        _ => panic!("too deep"),
+                    };
+
+                    let sequences_for_this_level = compute_optimal_moves_for_robot(
+                        from,
+                        to,
+                        keypad,
+                        current_level,
+                        &mut HashMap::new(),
+                    );
+
+                    if current_level == max_level {
+                        let result = sequences_for_this_level.first().unwrap().len();
+                        cache.insert((from, to, level), result);
+                        return result;
+                    } else {
+                        let next_level = level + 1;
+
+                        let new_sequences = sequences_for_this_level
+                            .iter()
+                            .map(|seq| {
+                                seq.chars()
+                                    .tuple_windows()
+                                    .map(|(from_1, to_1)| {
+                                        compute_number_of_sequences_recursive(
+                                            from_1,
+                                            to_1,
+                                            next_level,
+                                            max_level,
+                                            numeric_keypad,
+                                            directional_keypad,
+                                            cache,
+                                        )
+                                    })
+                                    .sum::<usize>()
+                            })
+                            .collect_vec();
+
+                        dbg!(next_level, new_sequences);
+                    }
+
+                    dbg!(current_level, from, to, &sequences_for_this_level);
+                    sequences_for_this_level
+                        .iter()
+                        .map(|seq| seq.len())
+                        .min()
+                        .unwrap()
+                })
+                .sum::<usize>();
+
+            cache.insert((from, to, level), result);
+            result
+        }
     }
 }
