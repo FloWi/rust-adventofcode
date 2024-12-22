@@ -11,7 +11,7 @@ pub fn process(input: &str) -> miette::Result<String> {
     let complexities = codes
         .iter()
         .cloned()
-        .map(|code| compute_complexity_part_1(code))
+        .map(compute_complexity_part_1)
         .collect_vec();
 
     let result: usize = complexities.iter().sum();
@@ -37,9 +37,8 @@ fn compute_complexity_part_1(input_code: &str) -> usize {
         .unwrap()
         .parse::<usize>()
         .unwrap();
-    let complexity = shortest_length * numeric_part_of_code;
 
-    complexity
+    shortest_length * numeric_part_of_code
 }
 
 struct KeyMap {
