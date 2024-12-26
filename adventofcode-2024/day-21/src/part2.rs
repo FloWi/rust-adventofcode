@@ -2,19 +2,16 @@ use crate::{DIRECTION_KEY_MAP, NUMERIC_KEY_MAP};
 use glam::IVec2;
 use itertools::Itertools;
 use pathfinding::prelude::astar_bag;
-use std::cmp::max;
 use std::collections::HashMap;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
     let codes = input.trim().lines().collect_vec();
 
-    let mut call_map = HashMap::new();
-
     let complexities = codes
         .iter()
         .cloned()
-        .map(|code| compute_complexity(code, &mut call_map))
+        .map(|code| compute_complexity(code, 25))
         .collect_vec();
 
     let result: usize = complexities.iter().sum();
@@ -22,37 +19,18 @@ pub fn process(input: &str) -> miette::Result<String> {
     Ok(result.to_string())
 }
 
-fn compute_complexity(input_code: &str, call_map: &mut HashMap<(char, char, u32), usize>) -> usize {
+fn compute_complexity(input_code: &str, level: u32) -> usize {
     let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
     let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
 
-    // final numeric robot
-    let robot_0_sequences =
-        compute_all_sequences_for_robot(input_code, &numeric_key_map, 0, call_map);
-
-    // 1st directional robot
-    let robot_1_sequences = robot_0_sequences
-        .into_iter()
-        .flat_map(|seq| compute_all_sequences_for_robot(&seq, &directional_key_map, 1, call_map))
-        .collect_vec();
-
-    let shortest_length_robot_1_sequences =
-        robot_1_sequences.iter().map(|seq| seq.len()).min().unwrap();
-
-    let robot_1_sequences = robot_1_sequences
-        .iter()
-        .filter(|seq| seq.len() == shortest_length_robot_1_sequences)
-        .collect_vec();
-
-    // 2nd directional robot
-    let robot_2_sequences = robot_1_sequences
-        .into_iter()
-        .flat_map(|seq| compute_all_sequences_for_robot(&seq, &directional_key_map, 2, call_map))
-        .collect_vec();
-
-    let shortest_length_robot_2_sequences =
-        robot_2_sequences.iter().map(|seq| seq.len()).min().unwrap();
-    // let robot_2_sequences = robot_2_sequences.iter().filter(|seq| seq.len() == shortest_length_robot_2_sequences).collect_vec();
+    let shortest_length = compute_number_of_sequences_str(
+        input_code,
+        level,
+        level,
+        &numeric_key_map,
+        &directional_key_map,
+        &mut HashMap::new(),
+    );
 
     let numeric_part_of_code = input_code
         .strip_suffix("A")
@@ -60,7 +38,7 @@ fn compute_complexity(input_code: &str, call_map: &mut HashMap<(char, char, u32)
         .parse::<usize>()
         .unwrap();
 
-    shortest_length_robot_2_sequences * numeric_part_of_code
+    shortest_length * numeric_part_of_code
 }
 
 struct KeyMap {
@@ -245,10 +223,8 @@ mod tests {
 
     #[test_log::test]
     fn test_complexity_first_input() -> miette::Result<()> {
-        let mut call_map = HashMap::new();
-        assert_eq!(compute_complexity("029A", &mut call_map), 1972);
+        assert_eq!(compute_complexity("029A"), 1972);
 
-        dbg!(call_map);
         Ok(())
     }
 
