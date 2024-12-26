@@ -343,6 +343,84 @@ mod tests {
         let actual = compute_number_of_sequences_improved(test_code, 2);
         assert_eq!(actual, 68usize);
     }
+
+    #[test]
+    fn refactoring_to_dfs_1_char() {
+        let test_code = "0";
+
+        let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+        let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+
+        let mut cache = HashMap::new();
+
+        let actual = compute_number_of_sequences_str(
+            "0",
+            0,
+            0,
+            &numeric_key_map,
+            &directional_key_map,
+            &mut cache,
+        );
+
+        assert_eq!(actual, 2);
+    }
+
+    #[test]
+    fn refactoring_to_dfs__2_chars() {
+        let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+        let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+
+        let mut cache = HashMap::new();
+
+        let actual = compute_number_of_sequences_str(
+            "02",
+            0,
+            0,
+            &numeric_key_map,
+            &directional_key_map,
+            &mut cache,
+        );
+
+        assert_eq!(actual, 4);
+    }
+
+    #[test]
+    fn refactoring_to_dfs__3_chars() {
+        let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+        let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+
+        let mut cache = HashMap::new();
+
+        let actual = compute_number_of_sequences_str(
+            "029",
+            0,
+            0,
+            &numeric_key_map,
+            &directional_key_map,
+            &mut cache,
+        );
+
+        assert_eq!(actual, 8);
+    }
+
+    #[test]
+    fn refactoring_to_dfs__all_4_chars() {
+        let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+        let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+
+        let mut cache = HashMap::new();
+
+        let actual = compute_number_of_sequences_str(
+            "029A",
+            0,
+            0,
+            &numeric_key_map,
+            &directional_key_map,
+            &mut cache,
+        );
+
+        assert_eq!(actual, 12);
+    }
 }
 
 fn compute_number_of_sequences_improved(input: &str, number_of_numeric_keypads: u32) -> usize {
