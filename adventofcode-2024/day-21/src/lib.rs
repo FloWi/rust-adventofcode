@@ -219,6 +219,115 @@ fn compute_optimal_moves_for_robot(
     optimal_sequences
 }
 
+fn compute_number_of_sequences_improved(input: &str, number_of_numeric_keypads: u32) -> usize {
+    let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+    let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+
+    let mut cache = HashMap::new();
+    let levels = number_of_numeric_keypads + 1; // my directional keypad, the n directional keypads for the robots, the last numeric keypad for the robot
+
+    let result = compute_number_of_sequences_str(
+        input,
+        levels - 1,
+        levels - 1,
+        &numeric_key_map,
+        &directional_key_map,
+        &mut cache,
+    );
+
+    debug!("Cache overview: ");
+    cache
+        .into_iter()
+        .sorted_by_key(|((_, _, level), _)| *level)
+        .for_each(|((from, to, level), count)| {
+            debug!("Level {level}: {from}{to} = {count}");
+        });
+
+    result
+
+    // dbg!(cache);
+}
+
+fn compute_number_of_sequences_str(
+    input: &str,
+    level: u32,
+    max_level: u32,
+    numeric_keypad: &KeyMap,
+    directional_keypad: &KeyMap,
+    cache: &mut HashMap<(char, char, u32), usize>,
+) -> usize {
+    format!("A{input}")
+        .chars()
+        .tuple_windows()
+        .map(|(from, to)| {
+            compute_shortest_sequence_length_level_0(
+                from,
+                to,
+                level,
+                max_level,
+                numeric_keypad,
+                directional_keypad,
+                cache,
+            )
+        })
+        .sum()
+}
+
+fn compute_shortest_sequence_length_level_0(
+    from: char,
+    to: char,
+    level: u32,
+    max_level: u32,
+    numeric_keypad: &KeyMap,
+    directional_keypad: &KeyMap,
+    cache: &mut HashMap<(char, char, u32), usize>,
+) -> usize {
+    let keypad = match level {
+        l if l == max_level => numeric_keypad,
+        _ => directional_keypad,
+    };
+    debug!("computing: from = {from}, to = {to}, level = {level}, max_level = {max_level}");
+
+    match cache.get(&(from, to, level)) {
+        Some(result) => {
+            debug!("cache_hit: from = {from}, to = {to}, level = {level}, max_level = {max_level}, result = {result}");
+
+            *result
+        }
+        None => {
+            let moves =
+                compute_optimal_moves_for_robot(from, to, keypad, level, &mut HashMap::new());
+
+            let result = if level == 0 {
+                moves[0].len()
+            } else {
+                let next_level = level - 1;
+                debug!(
+                    "recursing to level {next_level} for moves: {}",
+                    &moves.join(", ")
+                );
+                moves
+                    .iter()
+                    .map(|seq_for_next_robot| {
+                        compute_number_of_sequences_str(
+                            seq_for_next_robot.as_str(),
+                            next_level,
+                            max_level,
+                            numeric_keypad,
+                            directional_keypad,
+                            cache,
+                        )
+                    })
+                    .min()
+                    .unwrap()
+            };
+            debug!("computed result: from = {from}, to = {to}, level = {level}, max_level = {max_level}, moves: {}, result = {result}", &moves.join(", "));
+            cache.insert((from, to, level), result);
+            result
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,7 +339,7 @@ mod tests {
 
     #[test_log::test]
     fn test_complexity_first_input() -> miette::Result<()> {
-        assert_eq!(compute_complexity("029A"), 1972);
+        assert_eq!(compute_complexity("029A", 2), 1972);
 
         Ok(())
     }
@@ -497,114 +606,5 @@ mod tests {
         // <vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A
 
         assert_eq!(actual, 68);
-    }
-}
-
-fn compute_number_of_sequences_improved(input: &str, number_of_numeric_keypads: u32) -> usize {
-    let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
-    let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
-
-    let mut cache = HashMap::new();
-    let levels = number_of_numeric_keypads + 1; // my directional keypad, the n directional keypads for the robots, the last numeric keypad for the robot
-
-    let result = compute_number_of_sequences_str(
-        input,
-        levels - 1,
-        levels - 1,
-        &numeric_key_map,
-        &directional_key_map,
-        &mut cache,
-    );
-
-    debug!("Cache overview: ");
-    cache
-        .into_iter()
-        .sorted_by_key(|((_, _, level), _)| *level)
-        .for_each(|((from, to, level), count)| {
-            debug!("Level {level}: {from}{to} = {count}");
-        });
-
-    result
-
-    // dbg!(cache);
-}
-
-fn compute_number_of_sequences_str(
-    input: &str,
-    level: u32,
-    max_level: u32,
-    numeric_keypad: &KeyMap,
-    directional_keypad: &KeyMap,
-    cache: &mut HashMap<(char, char, u32), usize>,
-) -> usize {
-    format!("A{input}")
-        .chars()
-        .tuple_windows()
-        .map(|(from, to)| {
-            compute_shortest_sequence_length_level_0(
-                from,
-                to,
-                level,
-                max_level,
-                &numeric_keypad,
-                &directional_keypad,
-                cache,
-            )
-        })
-        .sum()
-}
-
-fn compute_shortest_sequence_length_level_0(
-    from: char,
-    to: char,
-    level: u32,
-    max_level: u32,
-    numeric_keypad: &KeyMap,
-    directional_keypad: &KeyMap,
-    cache: &mut HashMap<(char, char, u32), usize>,
-) -> usize {
-    let keypad = match level {
-        l if l == max_level => numeric_keypad,
-        _ => directional_keypad,
-    };
-    debug!("computing: from = {from}, to = {to}, level = {level}, max_level = {max_level}");
-
-    match cache.get(&(from, to, level)) {
-        Some(result) => {
-            debug!("cache_hit: from = {from}, to = {to}, level = {level}, max_level = {max_level}, result = {result}");
-
-            *result
-        }
-        None => {
-            let moves =
-                compute_optimal_moves_for_robot(from, to, keypad, level, &mut HashMap::new());
-
-            let result = if level == 0 {
-                moves[0].len()
-            } else {
-                let next_level = level - 1;
-                debug!(
-                    "recursing to level {next_level} for moves: {}",
-                    &moves.join(", ")
-                );
-                moves
-                    .iter()
-                    .map(|seq_for_next_robot| {
-                        compute_number_of_sequences_str(
-                            seq_for_next_robot.as_str(),
-                            next_level,
-                            max_level,
-                            numeric_keypad,
-                            directional_keypad,
-                            cache,
-                        )
-                    })
-                    .min()
-                    .unwrap()
-            };
-            debug!("computed result: from = {from}, to = {to}, level = {level}, max_level = {max_level}, moves: {}, result = {result}", &moves.join(", "));
-            cache.insert((from, to, level), result);
-            result
-        }
     }
 }
