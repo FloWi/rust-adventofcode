@@ -4,7 +4,6 @@ use itertools::Itertools;
 use pathfinding::prelude::astar_bag;
 use std::cmp::max;
 use std::collections::HashMap;
-use tracing::info;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
@@ -115,12 +114,7 @@ fn compute_all_sequences_for_robot(
     let sequences = ("A".to_owned() + input)
         .chars()
         .tuple_windows()
-        .map(|(from, to)| {
-            compute_optimal_moves_for_robot(from, to, key_map, level, call_map)
-                .into_iter()
-                .map(|movement_sequence| movement_sequence + "A")
-                .collect_vec()
-        })
+        .map(|(from, to)| compute_optimal_moves_for_robot(from, to, key_map, level, call_map))
         .collect_vec();
 
     let all_possible_sequences = sequences
@@ -206,7 +200,7 @@ fn compute_optimal_moves_for_robot(
 
     let optimal_sequences = sequences
         .map(|positions| {
-            positions
+            let movement_str = positions
                 .iter()
                 .tuple_windows()
                 .map(|(from_pos, to_pos)| {
@@ -219,7 +213,8 @@ fn compute_optimal_moves_for_robot(
                         _ => panic!("should not happen"),
                     }
                 })
-                .join("")
+                .join("");
+            format!("{movement_str}A")
         })
         .collect_vec();
     optimal_sequences
@@ -307,20 +302,20 @@ mod tests {
     }
 
     #[rstest]
-    #[case('A', '0', "<")]
-    #[case('A', '1', "^<<, <^<")]
-    #[case('A', '2', "^<, <^")]
-    #[case('A', '3', "^")]
-    #[case('A', '4', "^^<<, <^^<, ^<^<, <^<^, ^<<^")]
-    #[case('A', '5', "^^<, <^^, ^<^")]
-    #[case('A', '6', "^^")]
+    #[case('A', '0', "<A")]
+    #[case('A', '1', "^<<A, <^<A")]
+    #[case('A', '2', "^<A, <^A")]
+    #[case('A', '3', "^A")]
+    #[case('A', '4', "^^<<A, <^^<A, ^<^<A, <^<^A, ^<<^A")]
+    #[case('A', '5', "^^<A, <^^A, ^<^A")]
+    #[case('A', '6', "^^A")]
     #[case(
         'A',
         '7',
-        "^^<^<, ^<^^<, <^^^<, ^^^<<, ^^<<^, ^<^<^, <^^<^, ^<<^^, <^<^^"
+        "^^<^<A, ^<^^<A, <^^^<A, ^^^<<A, ^^<<^A, ^<^<^A, <^^<^A, ^<<^^A, <^<^^A"
     )]
-    #[case('A', '8', "^^^<, ^^<^, ^<^^, <^^^")]
-    #[case('A', '9', "^^^")]
+    #[case('A', '8', "^^^<A, ^^<^A, ^<^^A, <^^^A")]
+    #[case('A', '9', "^^^A")]
     fn numeric_robot_one_move(
         #[case] from: char,
         #[case] to: char,
@@ -345,31 +340,26 @@ mod tests {
     fn refactoring_to_dfs() {
         let test_code = "029A";
 
-        compute_number_of_sequences_improved(test_code, 2);
+        let actual = compute_number_of_sequences_improved(test_code, 2);
+        assert_eq!(actual, 68usize);
     }
 }
 
-fn compute_number_of_sequences_improved(input: &str, number_of_numeric_keypads: u32) {
+fn compute_number_of_sequences_improved(input: &str, number_of_numeric_keypads: u32) -> usize {
     let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
     let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
 
     let mut cache = HashMap::new();
+    let levels = 1 + number_of_numeric_keypads + 1; // my directional keypad, the n directional keypads for the robots, the last numeric keypad for the robot
 
-    format!("A{input}")
-        .chars()
-        .tuple_windows()
-        .for_each(|(from, to)| {
-            let result = compute_number_of_sequences_recursive(
-                from,
-                to,
-                0,
-                number_of_numeric_keypads,
-                &numeric_key_map,
-                &directional_key_map,
-                &mut cache,
-            );
-            dbg!(result);
-        });
+    let result = compute_number_of_sequences_str(
+        input,
+        levels - 1,
+        levels - 1,
+        &numeric_key_map,
+        &directional_key_map,
+        &mut cache,
+    );
 
     println!("Cache overview: ");
     cache
@@ -379,11 +369,37 @@ fn compute_number_of_sequences_improved(input: &str, number_of_numeric_keypads: 
             println!("Level {level}: {from}{to} = {count}");
         });
 
-    println!("")
+    result
+
     // dbg!(cache);
 }
 
-fn compute_number_of_sequences_recursive(
+fn compute_number_of_sequences_str(
+    input: &str,
+    level: u32,
+    max_level: u32,
+    numeric_keypad: &KeyMap,
+    directional_keypad: &KeyMap,
+    cache: &mut HashMap<(char, char, u32), usize>,
+) -> usize {
+    format!("A{input}")
+        .chars()
+        .tuple_windows()
+        .map(|(from, to)| {
+            compute_shortest_sequence_length_level_0(
+                from,
+                to,
+                level,
+                max_level,
+                &numeric_keypad,
+                &directional_keypad,
+                cache,
+            )
+        })
+        .sum()
+}
+
+fn compute_shortest_sequence_length_level_0(
     from: char,
     to: char,
     level: u32,
@@ -392,64 +408,45 @@ fn compute_number_of_sequences_recursive(
     directional_keypad: &KeyMap,
     cache: &mut HashMap<(char, char, u32), usize>,
 ) -> usize {
+    let keypad = match level {
+        l if l == max_level => numeric_keypad,
+        _ => directional_keypad,
+    };
+    println!("computing: from = {from}, to = {to}, level = {level}, max_level = {max_level}");
+
     match cache.get(&(from, to, level)) {
-        Some(&result) => result,
+        Some(result) => {
+            println!("cache_hit: from = {from}, to = {to}, level = {level}, max_level = {max_level}, result = {result}");
+
+            *result
+        }
         None => {
-            let result = (level..=max_level)
-                .map(|current_level| {
-                    let keypad = match level {
-                        0 => numeric_keypad,
-                        n if (1..=max_level).contains(&n) => directional_keypad,
-                        _ => panic!("too deep"),
-                    };
+            let moves =
+                compute_optimal_moves_for_robot(from, to, keypad, level, &mut HashMap::new());
 
-                    let sequences_for_this_level = compute_optimal_moves_for_robot(
-                        from,
-                        to,
-                        keypad,
-                        current_level,
-                        &mut HashMap::new(),
-                    );
-
-                    if current_level == max_level {
-                        let result = sequences_for_this_level.first().unwrap().len();
-                        cache.insert((from, to, level), result);
-                        return result;
-                    } else {
-                        let next_level = level + 1;
-
-                        let new_sequences = sequences_for_this_level
-                            .iter()
-                            .map(|seq| {
-                                seq.chars()
-                                    .tuple_windows()
-                                    .map(|(from_1, to_1)| {
-                                        compute_number_of_sequences_recursive(
-                                            from_1,
-                                            to_1,
-                                            next_level,
-                                            max_level,
-                                            numeric_keypad,
-                                            directional_keypad,
-                                            cache,
-                                        )
-                                    })
-                                    .sum::<usize>()
-                            })
-                            .collect_vec();
-
-                        dbg!(next_level, new_sequences);
-                    }
-
-                    dbg!(current_level, from, to, &sequences_for_this_level);
-                    sequences_for_this_level
-                        .iter()
-                        .map(|seq| seq.len())
-                        .min()
-                        .unwrap()
-                })
-                .sum::<usize>();
-
+            let result = if level == 0 {
+                moves[0].len()
+            } else {
+                let next_level = level - 1;
+                println!(
+                    "recursing to level {next_level} for moves: {}",
+                    &moves.join(", ")
+                );
+                moves
+                    .iter()
+                    .map(|seq_for_next_robot| {
+                        compute_number_of_sequences_str(
+                            seq_for_next_robot.as_str(),
+                            next_level,
+                            max_level,
+                            numeric_keypad,
+                            directional_keypad,
+                            cache,
+                        )
+                    })
+                    .sum()
+            };
+            println!("computed result: from = {from}, to = {to}, level = {level}, max_level = {max_level}, moves: {}, result = {result}", &moves.join(", "));
             cache.insert((from, to, level), result);
             result
         }
