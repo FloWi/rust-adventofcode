@@ -103,66 +103,6 @@ v<<A>>^A<A>AvA<^AA>A<vAAA>^A
 
  */
 
-fn compute_all_sequences_for_robot(
-    input: &str,
-    key_map: &KeyMap,
-    level: u32,
-    call_map: &mut HashMap<(char, char, u32), usize>,
-) -> Vec<String> {
-    // robot arm starts on A
-    let sequences = ("A".to_owned() + input)
-        .chars()
-        .tuple_windows()
-        .map(|(from, to)| compute_optimal_moves_for_robot(from, to, key_map, level, call_map))
-        .collect_vec();
-
-    let all_possible_sequences = sequences
-        .iter()
-        .cloned()
-        .multi_cartesian_product()
-        .map(|combo| combo.join(""))
-        .collect_vec();
-
-    /*
-    [day-21/src/part1.rs:64:5] sequences = [
-        [
-            "<A",
-        ],
-        [
-            "^A",
-        ],
-        [
-            "^^>A",
-            ">^^A",
-            "^>^A",
-        ],
-        [
-            "vvvA",
-        ],
-    ]
-
-    [day-21/src/part1.rs:85:5] all_possible_sequences = [
-    "<A^A^>^AvvvA",
-    "<A^A>^^AvvvA",
-    "<A^A^^>AvvvA",
-    ]
-             */
-
-    let shortest_length = all_possible_sequences
-        .iter()
-        .map(|seq| seq.len())
-        .min()
-        .unwrap();
-    assert!(
-        all_possible_sequences
-            .iter()
-            .all(|seq| seq.len() == shortest_length),
-        "all sequences must have the same length"
-    );
-
-    all_possible_sequences
-}
-
 fn compute_optimal_moves_for_robot(
     from: char,
     to: char,
@@ -217,35 +157,6 @@ fn compute_optimal_moves_for_robot(
         })
         .collect_vec();
     optimal_sequences
-}
-
-fn compute_number_of_sequences_improved(input: &str, number_of_numeric_keypads: u32) -> usize {
-    let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
-    let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
-
-    let mut cache = HashMap::new();
-    let levels = number_of_numeric_keypads + 1; // my directional keypad, the n directional keypads for the robots, the last numeric keypad for the robot
-
-    let result = compute_number_of_sequences_str(
-        input,
-        levels - 1,
-        levels - 1,
-        &numeric_key_map,
-        &directional_key_map,
-        &mut cache,
-    );
-
-    debug!("Cache overview: ");
-    cache
-        .into_iter()
-        .sorted_by_key(|((_, _, level), _)| *level)
-        .for_each(|((from, to, level), count)| {
-            debug!("Level {level}: {from}{to} = {count}");
-        });
-
-    result
-
-    // dbg!(cache);
 }
 
 fn compute_number_of_sequences_str(
@@ -376,23 +287,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn first_robot_moves() {
-        let input = "029A";
-        let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
-        let expected_optimal_sequences = vec!["<A^A>^^AvvvA", "<A^A^>^AvvvA", "<A^A^^>AvvvA"]
-            .into_iter()
-            .map(|string| string.to_string())
-            .collect_vec();
-
-        let mut call_map = HashMap::new();
-
-        let actual_sequences: Vec<String> =
-            compute_all_sequences_for_robot("029A", &numeric_key_map, 1, &mut call_map);
-
-        assert_eq_unordered!(actual_sequences, expected_optimal_sequences)
-    }
-
     #[rstest]
     #[case('A', '0', "<A")]
     #[case('A', '1', "^<<A, <^<A")]
@@ -426,14 +320,6 @@ mod tests {
             compute_optimal_moves_for_robot(from, to, &numeric_key_map, 1, &mut call_map),
             expected
         );
-    }
-
-    #[test]
-    fn refactoring_to_dfs() {
-        let test_code = "029A";
-
-        let actual = compute_number_of_sequences_improved(test_code, 2);
-        assert_eq!(actual, 68usize);
     }
 
     #[test]
