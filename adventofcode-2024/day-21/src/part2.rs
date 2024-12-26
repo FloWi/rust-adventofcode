@@ -345,9 +345,7 @@ mod tests {
     }
 
     #[test]
-    fn refactoring_to_dfs_1_char() {
-        let test_code = "0";
-
+    fn refactoring_to_dfs_level_0_1_char() {
         let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
         let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
 
@@ -366,7 +364,7 @@ mod tests {
     }
 
     #[test]
-    fn refactoring_to_dfs__2_chars() {
+    fn refactoring_to_dfs_level_0__2_chars() {
         let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
         let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
 
@@ -385,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn refactoring_to_dfs__3_chars() {
+    fn refactoring_to_dfs_level_0__3_chars() {
         let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
         let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
 
@@ -404,7 +402,7 @@ mod tests {
     }
 
     #[test]
-    fn refactoring_to_dfs__all_4_chars() {
+    fn refactoring_to_dfs_level_0__all_4_chars() {
         let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
         let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
 
@@ -421,6 +419,102 @@ mod tests {
 
         assert_eq!(actual, 12);
     }
+
+    #[test]
+    fn refactoring_to_dfs_level_1_1_char() {
+        let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+        let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+
+        let mut cache = HashMap::new();
+
+        let actual = compute_number_of_sequences_str(
+            "0",
+            1,
+            1,
+            &numeric_key_map,
+            &directional_key_map,
+            &mut cache,
+        );
+
+        assert_eq!(actual, 8);
+    }
+
+    #[test]
+    fn refactoring_to_dfs_level_1_2_chars() {
+        let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+        let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+
+        let mut cache = HashMap::new();
+
+        let actual = compute_number_of_sequences_str(
+            "02",
+            1,
+            1,
+            &numeric_key_map,
+            &directional_key_map,
+            &mut cache,
+        );
+
+        assert_eq!(actual, 12);
+    }
+
+    #[test]
+    fn refactoring_to_dfs_level_1_3_chars() {
+        let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+        let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+
+        let mut cache = HashMap::new();
+
+        let actual = compute_number_of_sequences_str(
+            "029",
+            1,
+            1,
+            &numeric_key_map,
+            &directional_key_map,
+            &mut cache,
+        );
+
+        assert_eq!(actual, 20);
+    }
+
+    #[test]
+    fn refactoring_to_dfs_level_1_all_4_chars() {
+        let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+        let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+
+        let mut cache = HashMap::new();
+
+        let actual = compute_number_of_sequences_str(
+            "029A",
+            1,
+            1,
+            &numeric_key_map,
+            &directional_key_map,
+            &mut cache,
+        );
+
+        assert_eq!(actual, 28);
+    }
+
+    #[test]
+    fn refactoring_to_dfs_level_2_all_4_chars() {
+        let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
+        let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
+
+        let mut cache = HashMap::new();
+
+        let actual = compute_number_of_sequences_str(
+            "029A",
+            2,
+            2,
+            &numeric_key_map,
+            &directional_key_map,
+            &mut cache,
+        );
+        // <vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A
+
+        assert_eq!(actual, 68);
+    }
 }
 
 fn compute_number_of_sequences_improved(input: &str, number_of_numeric_keypads: u32) -> usize {
@@ -428,7 +522,7 @@ fn compute_number_of_sequences_improved(input: &str, number_of_numeric_keypads: 
     let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
 
     let mut cache = HashMap::new();
-    let levels = 1 + number_of_numeric_keypads + 1; // my directional keypad, the n directional keypads for the robots, the last numeric keypad for the robot
+    let levels = number_of_numeric_keypads + 1; // my directional keypad, the n directional keypads for the robots, the last numeric keypad for the robot
 
     let result = compute_number_of_sequences_str(
         input,
@@ -522,7 +616,8 @@ fn compute_shortest_sequence_length_level_0(
                             cache,
                         )
                     })
-                    .sum()
+                    .min()
+                    .unwrap()
             };
             println!("computed result: from = {from}, to = {to}, level = {level}, max_level = {max_level}, moves: {}, result = {result}", &moves.join(", "));
             cache.insert((from, to, level), result);
