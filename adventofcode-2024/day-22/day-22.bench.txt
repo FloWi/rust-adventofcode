@@ -1,0 +1,34 @@
+day_22_bench      fastest       │ slowest       │ median        │ mean          │ samples │ iters
+├─ part1          10.6 ms       │ 11.37 ms      │ 10.62 ms      │ 10.67 ms      │ 100     │ 100
+╰─ part2          192.5 ms      │ 215.7 ms      │ 194 ms        │ 194.4 ms      │ 100     │ 100
+╰─ part2 (rayon)  47.54 ms      │ 64.71 ms      │ 54.26 ms      │ 54.47 ms      │ 100     │ 100
+
+day_22_alloc  fastest       │ slowest       │ median        │ mean          │ samples │ iters
+├─ part1      10.6 ms       │ 11.36 ms      │ 10.62 ms      │ 10.64 ms      │ 100     │ 100
+│             max alloc:    │               │               │               │         │
+│               1           │ 1             │ 1             │ 1             │         │
+│               32.76 KB    │ 32.76 KB      │ 32.76 KB      │ 32.76 KB      │         │
+│             alloc:        │               │               │               │         │
+│               2           │ 2             │ 2             │ 2             │         │
+│               43 B        │ 43 B          │ 43 B          │ 43 B          │         │
+│             dealloc:      │               │               │               │         │
+│               2           │ 2             │ 2             │ 2             │         │
+│               32.77 KB    │ 32.77 KB      │ 32.77 KB      │ 32.77 KB      │         │
+│             grow:         │               │               │               │         │
+│               10          │ 10            │ 10            │ 10            │         │
+│               32.73 KB    │ 32.73 KB      │ 32.73 KB      │ 32.73 KB      │         │
+╰─ part2      193 ms        │ 197.5 ms      │ 193.8 ms      │ 193.9 ms      │ 100     │ 100
+              max alloc:    │               │               │               │         │
+                3           │ 3             │ 3             │ 3             │         │
+                1.769 MB    │ 1.769 MB      │ 1.769 MB      │ 1.769 MB      │         │
+              alloc:        │               │               │               │         │
+                2457        │ 2457          │ 2457          │ 2457          │         │
+                173.1 MB    │ 173.1 MB      │ 173.1 MB      │ 173.1 MB      │         │
+              dealloc:      │               │               │               │         │
+                2457        │ 2457          │ 2457          │ 2457          │         │
+                173.2 MB    │ 173.2 MB      │ 173.2 MB      │ 173.2 MB      │         │
+              grow:         │               │               │               │         │
+                10          │ 10            │ 10            │ 10            │         │
+                32.73 KB    │ 32.73 KB      │ 32.73 KB      │ 32.73 KB      │         │
+
+

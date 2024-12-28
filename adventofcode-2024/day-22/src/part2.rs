@@ -58,8 +58,12 @@ fn mix_and_prune(secret: u64, num: u64) -> u64 {
 }
 
 fn find_best_purchase_diff_sequence(seeds: Vec<u64>) -> u64 {
-    let summary = seeds
-        .into_iter()
+    let summary_map_capacity = seeds.len() * 20; //rough guesstimate - for the real input (2500 seeds, the final map had 40951 entries)
+
+    use rayon::prelude::*;
+
+    let summary_map: HashMap<_, _> = seeds
+        .into_par_iter()
         .map(|seed| {
             generate_and_analyze_secrets(seed).fold(
                 HashMap::with_capacity(2000),
@@ -70,8 +74,8 @@ fn find_best_purchase_diff_sequence(seeds: Vec<u64>) -> u64 {
                 },
             )
         })
-        .fold(
-            HashMap::with_capacity(2000),
+        .reduce(
+            || HashMap::with_capacity(summary_map_capacity),
             |mut outer_acc, per_seed_acc| {
                 per_seed_acc.into_iter().for_each(|(changes, p)| {
                     outer_acc
@@ -83,7 +87,7 @@ fn find_best_purchase_diff_sequence(seeds: Vec<u64>) -> u64 {
             },
         );
 
-    summary
+    summary_map
         .into_iter()
         .sorted_by_key(|tup| tup.1)
         .rev()
@@ -96,8 +100,6 @@ fn find_best_purchase_diff_sequence(seeds: Vec<u64>) -> u64 {
 mod tests {
     use super::*;
     use itertools::Itertools;
-    use std::collections::{HashMap, HashSet};
-    use std::ops::Not;
 
     #[test]
     fn test_process() -> miette::Result<()> {
