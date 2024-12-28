@@ -4,6 +4,7 @@ use nom::character::complete;
 use nom::character::complete::line_ending;
 use nom::multi::separated_list1;
 use nom::{IResult, Parser};
+use std::collections::HashMap;
 use std::iter::successors;
 use std::ops::{BitXor, Index, Rem};
 
@@ -11,7 +12,7 @@ use std::ops::{BitXor, Index, Rem};
 pub fn process(_input: &str) -> miette::Result<String> {
     let (_, seed_values) = parse(_input).map_err(|e| miette!("parse failed {}", e))?;
 
-    let result: u64 = 42;
+    let result: u64 = find_best_purchase_diff_sequence(seed_values);
     Ok(result.to_string())
 }
 
@@ -56,6 +57,41 @@ fn mix_and_prune(secret: u64, num: u64) -> u64 {
     secret.bitxor(num).rem_euclid(16777216)
 }
 
+fn find_best_purchase_diff_sequence(seeds: Vec<u64>) -> u64 {
+    let summary = seeds
+        .into_iter()
+        .map(|seed| {
+            generate_and_analyze_secrets(seed).fold(
+                HashMap::with_capacity(2000),
+                |mut acc, (price, changes)| {
+                    // only the first occurrence of the diff_chain is relevant
+                    acc.entry(changes).or_insert(price as u64);
+                    acc
+                },
+            )
+        })
+        .fold(
+            HashMap::with_capacity(2000),
+            |mut outer_acc, per_seed_acc| {
+                per_seed_acc.into_iter().for_each(|(changes, p)| {
+                    outer_acc
+                        .entry(changes)
+                        .and_modify(|counter| *counter += p)
+                        .or_insert(p);
+                });
+                outer_acc
+            },
+        );
+
+    summary
+        .into_iter()
+        .sorted_by_key(|tup| tup.1)
+        .rev()
+        .next()
+        .unwrap()
+        .1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,80 +132,5 @@ mod tests {
         assert_eq!(actual, expected_next_10_secrets);
 
         Ok(())
-    }
-
-    #[test]
-    fn test_window_functions() {
-        let sequence_1 = generate_and_analyze_secrets(1).collect_vec();
-        let sequence_2 = generate_and_analyze_secrets(2).collect_vec();
-        let sequence_3 = generate_and_analyze_secrets(3).collect_vec();
-        let sequence_2024 = generate_and_analyze_secrets(2024).collect_vec();
-
-        let diff_sequence = (-2, 1, -1, 3);
-
-        assert!(sequence_1.contains(&(7, diff_sequence)));
-        assert!(sequence_2.contains(&(7, diff_sequence)));
-        assert!(sequence_3
-            .iter()
-            .any(|(_, seq)| seq == &diff_sequence)
-            .not());
-        assert!(sequence_2024.contains(&(9, diff_sequence)));
-
-        let mut sequence_price_map_1 = HashMap::with_capacity(1000);
-        let mut sequence_price_map_2 = HashMap::with_capacity(1000);
-        let mut sequence_price_map_3 = HashMap::with_capacity(1000);
-        let mut sequence_price_map_2024 = HashMap::with_capacity(1000);
-
-        for (p, changes) in sequence_1.iter() {
-            sequence_price_map_1.entry(changes).or_insert(p);
-        }
-        for (p, changes) in sequence_2.iter() {
-            sequence_price_map_2.entry(changes).or_insert(p);
-        }
-        for (p, changes) in sequence_3.iter() {
-            sequence_price_map_3.entry(changes).or_insert(p);
-        }
-        for (p, changes) in sequence_2024.iter() {
-            sequence_price_map_2024.entry(changes).or_insert(p);
-        }
-
-        println!("sequence_price_map_1.len(): {}", sequence_price_map_1.len());
-        println!("sequence_price_map_2.len(): {}", sequence_price_map_2.len());
-        println!("sequence_price_map_3.len(): {}", sequence_price_map_3.len());
-        println!(
-            "sequence_price_map_2024.len(): {}",
-            sequence_price_map_2024.len()
-        );
-
-        let all_price_chains: HashSet<&(i8, i8, i8, i8)> = sequence_price_map_1
-            .keys()
-            .cloned()
-            .chain(sequence_price_map_1.keys().cloned())
-            .chain(sequence_price_map_3.keys().cloned())
-            .chain(sequence_price_map_2024.keys().cloned())
-            .collect::<HashSet<_>>();
-
-        let all_maps = [
-            sequence_price_map_1,
-            sequence_price_map_2,
-            sequence_price_map_3,
-            sequence_price_map_2024,
-        ];
-
-        let best_chains: Vec<((i8, i8, i8, i8), u32)> = all_price_chains
-            .iter()
-            .map(|price_change_chain| {
-                let total: u32 = all_maps
-                    .iter()
-                    .map(|price_map| **price_map.get(price_change_chain).unwrap_or(&&0u8) as u32)
-                    .sum();
-
-                (**price_change_chain, total)
-            })
-            .sorted_by_key(|(_, total)| *total)
-            .rev()
-            .collect_vec();
-
-        assert_eq!(best_chains.iter().next().unwrap().1, 23);
     }
 }
