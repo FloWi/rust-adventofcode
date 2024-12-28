@@ -4,7 +4,7 @@ use nom::character::complete::line_ending;
 use nom::multi::separated_list1;
 use nom::IResult;
 use std::iter::successors;
-use std::ops::{BitXor, Rem};
+use std::ops::BitXor;
 
 #[tracing::instrument]
 pub fn process(_input: &str) -> miette::Result<String> {

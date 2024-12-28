@@ -3,10 +3,10 @@ use miette::miette;
 use nom::character::complete;
 use nom::character::complete::line_ending;
 use nom::multi::separated_list1;
-use nom::{IResult, Parser};
+use nom::IResult;
 use std::collections::HashMap;
 use std::iter::successors;
-use std::ops::{BitXor, Index, Rem};
+use std::ops::BitXor;
 
 #[tracing::instrument]
 pub fn process(_input: &str) -> miette::Result<String> {
@@ -44,12 +44,8 @@ fn generate_and_analyze_secrets(initial: u64) -> impl Iterator<Item = (u8, (i8, 
         .filter_map(|(tup_1, tup_2, tup_3, tup_4)| {
             let initial_price = tup_4.1;
             let price_changes = tup_1.2.zip(tup_2.2).zip(tup_3.2).zip(tup_4.2);
-            match price_changes {
-                None => None,
-                Some((((ch_1, ch_2), ch_3), ch_4)) => {
-                    Some((initial_price, (ch_1, ch_2, ch_3, ch_4)))
-                }
-            }
+            price_changes
+                .map(|(((ch_1, ch_2), ch_3), ch_4)| (initial_price, (ch_1, ch_2, ch_3, ch_4)))
         })
 }
 
@@ -90,8 +86,7 @@ fn find_best_purchase_diff_sequence(seeds: Vec<u64>) -> u64 {
     summary_map
         .into_iter()
         .sorted_by_key(|tup| tup.1)
-        .rev()
-        .next()
+        .next_back()
         .unwrap()
         .1
 }
