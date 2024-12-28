@@ -12,7 +12,7 @@ pub fn process(_input: &str) -> miette::Result<String> {
 
     let result: u64 = seed_values
         .into_iter()
-        .map(|seed| generate_secrets(seed).skip(1999).next().unwrap())
+        .map(|seed| generate_secrets(seed).nth(2000).unwrap())
         .sum();
     Ok(result.to_string())
 }
