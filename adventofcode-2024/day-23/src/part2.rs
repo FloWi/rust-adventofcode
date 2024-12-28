@@ -24,6 +24,20 @@ pub fn process(input: &str) -> miette::Result<String> {
         )
     }
 
+    let denormalized = connection_map
+        .iter()
+        .map(|(key, connections)| {
+            connections
+                .into_iter()
+                .chain([key])
+                .cloned()
+                .collect::<HashSet<_>>()
+        })
+        .collect_vec();
+    let clusters = find_connection_clusters_of_size(13, denormalized);
+
+    dbg!(clusters);
+
     let result = "foobar";
 
     Ok(result.to_string())
@@ -42,31 +56,27 @@ fn parse(input: &str) -> IResult<&str, Vec<(String, String)>> {
     ))
 }
 
-fn find_three_interconnected_computers(
-    connection_map: HashMap<String, HashSet<String>>,
-) -> HashSet<[String; 3]> {
-    /*
-    "aq": { "cg", "yn", "wq", "vc", },
-    "yn": { "td", "wh", "cg", "aq", },
-    "cg": { "aq", "de", "yn", "tb", },
-
-    aq,cg,yn
-    */
-    let mut result = HashSet::new();
-    for (comp_1, connections_1) in connection_map.iter() {
-        for (comp_2, comp_3) in connections_1.iter().tuple_combinations() {
-            let has_connections_between_2_3 = connection_map
-                .get(comp_2)
-                .map(|connections_2| connections_2.contains(comp_3))
-                .unwrap_or(false);
-            if has_connections_between_2_3 {
-                let mut connections = [comp_1.clone(), comp_2.clone(), comp_3.clone()];
-                connections.sort();
-                result.insert(connections);
-            }
-        }
-    }
-    result
+fn find_connection_clusters_of_size(
+    size: usize,
+    connections: Vec<HashSet<String>>,
+) -> Vec<Vec<String>> {
+    connections
+        .into_iter()
+        .permutations(size)
+        .filter_map(|connection_combination| {
+            let all_intersections = connection_combination
+                .into_iter()
+                .reduce(|acc, curr| {
+                    acc.intersection(&curr)
+                        .cloned()
+                        .collect::<HashSet<String>>()
+                })
+                .unwrap_or(HashSet::new());
+            (all_intersections.len() == size)
+                .then(|| all_intersections.into_iter().sorted().collect_vec())
+        })
+        .unique()
+        .collect_vec()
 }
 
 #[cfg(test)]
@@ -172,23 +182,7 @@ td-yn
             ]),
         ];
 
-        let four_connections = connections
-            .into_iter()
-            .permutations(4)
-            .filter_map(|connection_combination| {
-                let all_intersections = connection_combination
-                    .into_iter()
-                    .reduce(|acc, curr| {
-                        acc.intersection(&curr)
-                            .cloned()
-                            .collect::<HashSet<String>>()
-                    })
-                    .unwrap_or(HashSet::new());
-                (all_intersections.len() == 4)
-                    .then(|| all_intersections.into_iter().sorted().collect_vec())
-            })
-            .unique()
-            .collect_vec();
+        let four_connections = find_connection_clusters_of_size(4, connections);
 
         dbg!(&four_connections);
 
