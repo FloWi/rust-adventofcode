@@ -25,5 +25,6 @@ test-log = { version = "0.2.13", default-features = false, features = [
 thiserror = "2.0.3"
 pathfinding = "4.11.0"
 cached = "0.54.0"
+petgraph = "0.6.5"
 
 assert_unordered = "0.3.5"

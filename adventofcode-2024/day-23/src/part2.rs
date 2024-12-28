@@ -4,79 +4,88 @@ use nom::character::complete::{alpha1, char, line_ending};
 use nom::multi::separated_list1;
 use nom::sequence::separated_pair;
 use nom::IResult;
-use std::collections::{HashMap, HashSet};
+use petgraph::prelude::*;
+use tracing::info;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
     let (_, connections) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
 
-    let connection_map: HashMap<String, HashSet<String>> = connections
-        .into_iter()
-        .flat_map(|(from, to)| vec![(from.clone(), to.clone()), (to, from)])
-        .into_grouping_map()
-        .collect();
+    let g = &UnGraphMap::<&str, ()>::from_edges(connections);
 
-    for (from, connections) in connection_map.iter().sorted_by_key(|(key, _)| key.clone()) {
-        let connection_str = connections.iter().sorted().join(",");
-        println!(
-            "{from} has {} connections: {connection_str}",
-            connections.len()
-        )
+    if let Some(the_one) = find_the_largest_interconnected_cluster(g) {
+        Ok(the_one)
+    } else {
+        panic!()
     }
-
-    let denormalized = connection_map
-        .iter()
-        .map(|(key, connections)| {
-            connections
-                .into_iter()
-                .chain([key])
-                .cloned()
-                .collect::<HashSet<_>>()
-        })
-        .collect_vec();
-    let clusters = find_connection_clusters_of_size(13, denormalized);
-
-    dbg!(clusters);
-
-    let result = "foobar";
-
-    Ok(result.to_string())
 }
 
-fn parse(input: &str) -> IResult<&str, Vec<(String, String)>> {
+fn find_the_largest_interconnected_cluster(g: &GraphMap<&str, (), Undirected>) -> Option<String> {
+    let max_num_neighbors = g
+        .nodes()
+        .map(|node| g.neighbors(node).count())
+        .max()
+        .unwrap();
+    info!("Max number of neighbors: {max_num_neighbors}");
+
+    (0..max_num_neighbors).rev().find_map(|size| {
+        info!("Trying to find interconnected cluster of size {size}");
+        g.nodes().for_each(|node| {
+            let neighbors = g.neighbors(node).collect_vec();
+            info!(
+                "node {node} has {} neighbors: {}",
+                neighbors.len(),
+                neighbors.iter().sorted().join(", ")
+            )
+        });
+
+        let clusters = g
+            .nodes()
+            .flat_map(|node| {
+                g.neighbors(node)
+                    .combinations(size)
+                    .filter_map(move |neighbor_candidates| {
+                        let all_connected = neighbor_candidates
+                            .iter()
+                            .tuple_combinations()
+                            .all(move |(a, b)| g.contains_edge(a, b));
+                        if all_connected {
+                            Some(
+                                vec![node]
+                                    .into_iter()
+                                    .chain(neighbor_candidates)
+                                    .sorted()
+                                    .collect_vec(),
+                            )
+                        } else {
+                            None
+                        }
+                    })
+            })
+            .unique()
+            .take(2) //short circuit - we only need one, so we stop after finding a 2nd one.
+            .collect_vec();
+
+        match clusters.as_slice() {
+            [the_one] => {
+                info!("Found 1 interconnected cluster of size {size}");
+                Some(the_one.join(","))
+            }
+            _ => {
+                info!(
+                    "Found 0 or more interconnected cluster of size {size}, but we only want one"
+                );
+                None
+            }
+        }
+    })
+}
+
+fn parse(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
     let (rest, connections) =
         separated_list1(line_ending, separated_pair(alpha1, char('-'), alpha1))(input)?;
 
-    Ok((
-        rest,
-        connections
-            .into_iter()
-            .map(|(comp_1, comp_2)| (comp_1.to_string(), comp_2.to_string()))
-            .collect_vec(),
-    ))
-}
-
-fn find_connection_clusters_of_size(
-    size: usize,
-    connections: Vec<HashSet<String>>,
-) -> Vec<Vec<String>> {
-    connections
-        .into_iter()
-        .permutations(size)
-        .filter_map(|connection_combination| {
-            let all_intersections = connection_combination
-                .into_iter()
-                .reduce(|acc, curr| {
-                    acc.intersection(&curr)
-                        .cloned()
-                        .collect::<HashSet<String>>()
-                })
-                .unwrap_or(HashSet::new());
-            (all_intersections.len() == size)
-                .then(|| all_intersections.into_iter().sorted().collect_vec())
-        })
-        .unique()
-        .collect_vec()
+    Ok((rest, connections.into_iter().collect_vec()))
 }
 
 #[cfg(test)]
@@ -140,53 +149,5 @@ td-yn
 
         assert_eq!("co,de,ka,ta", process(input)?);
         Ok(())
-    }
-
-    #[test]
-    fn set_experiments() {
-        /*
-        co,de,ka,ta,tc
-        cg,co,de,ka,ta
-        co,de,ka,ta,tb
-        co,de,ka,kh,ta
-                 */
-
-        let connections = vec![
-            HashSet::from([
-                "co".to_string(),
-                "de".to_string(),
-                "ka".to_string(),
-                "ta".to_string(),
-                "tc".to_string(),
-            ]),
-            HashSet::from([
-                "cg".to_string(),
-                "co".to_string(),
-                "de".to_string(),
-                "ka".to_string(),
-                "ta".to_string(),
-            ]),
-            HashSet::from([
-                "co".to_string(),
-                "de".to_string(),
-                "ka".to_string(),
-                "ta".to_string(),
-                "tb".to_string(),
-            ]),
-            HashSet::from([
-                "co".to_string(),
-                "de".to_string(),
-                "ka".to_string(),
-                "kh".to_string(),
-                "ta".to_string(),
-            ]),
-        ];
-
-        let four_connections = find_connection_clusters_of_size(4, connections);
-
-        dbg!(&four_connections);
-
-        assert_eq!(four_connections.len(), 1);
-        assert_eq!(four_connections[0], ["co", "de", "ka", "ta"]);
     }
 }
