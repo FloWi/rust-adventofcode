@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use miette::miette;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -8,27 +9,48 @@ use nom::combinator::value;
 use nom::multi::separated_list1;
 use nom::sequence::{preceded, separated_pair, tuple};
 use nom::{IResult, Parser};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+use std::fmt::{Display, Formatter};
+use std::ops::{BitAnd, BitOr, BitXor, Not};
+use tracing::info;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
-    let (_, (initial_signals, gates)) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
+    let (_, (initial_signals, gates)): (&str, (HashMap<Signal, bool>, Vec<Gate>)) =
+        parse(input).map_err(|e| miette!("parse failed {}", e))?;
 
-    dbg!(initial_signals, gates);
+    let final_signals = evaluate_dag(&initial_signals, gates);
+    let binary: String = final_signals
+        .into_iter()
+        .filter(|(key, _)| key.0.starts_with("z"))
+        .sorted_by_key(|(key, _)| key.0)
+        .rev() // most significant bit first
+        .map(|(_, value)| (value as u8).to_string())
+        .collect();
 
-    let result = 42;
-
+    let result = u64::from_str_radix(&binary, 2).unwrap();
     Ok(result.to_string())
 }
 
-#[derive(Eq, PartialEq, Hash, Debug)]
+#[derive(Eq, PartialEq, Hash, Debug, Clone)]
 struct Signal<'a>(&'a str);
 
 #[derive(Debug, Clone)]
 enum Operator {
-    Xor,
-    Or,
-    And,
+    XOR,
+    OR,
+    AND,
+}
+
+impl Display for Operator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let label = match self {
+            Operator::XOR => "XOR",
+            Operator::OR => "OR",
+            Operator::AND => "AND",
+        };
+        f.write_str(label)
+    }
 }
 
 #[derive(Debug)]
@@ -37,6 +59,16 @@ struct Gate<'a> {
     in_2: Signal<'a>,
     op: Operator,
     out: Signal<'a>,
+}
+
+impl<'a> Gate<'a> {
+    pub(crate) fn eval(&self, in1: bool, in2: bool) -> bool {
+        match self.op {
+            Operator::XOR => in1.bitxor(in2),
+            Operator::OR => in1.bitor(in2),
+            Operator::AND => in1.bitand(in2),
+        }
+    }
 }
 
 fn parse(input: &str) -> IResult<&str, (HashMap<Signal, bool>, Vec<Gate>)> {
@@ -54,7 +86,7 @@ fn parse(input: &str) -> IResult<&str, (HashMap<Signal, bool>, Vec<Gate>)> {
     )(input)?;
 
     //now proceeding with shadowed input (rest)
-    println!("rest: \n{input}");
+    info!("rest: \n{input}");
 
     let (input, gates) = preceded(
         multispace1,
@@ -64,9 +96,9 @@ fn parse(input: &str) -> IResult<&str, (HashMap<Signal, bool>, Vec<Gate>)> {
                 tuple((
                     alphanumeric1.map(|s: &str| Signal(s)),
                     alt((
-                        value(Operator::And, tag(" AND ")),
-                        value(Operator::Or, tag(" OR ")),
-                        value(Operator::Xor, tag(" XOR ")),
+                        value(Operator::AND, tag(" AND ")),
+                        value(Operator::OR, tag(" OR ")),
+                        value(Operator::XOR, tag(" XOR ")),
                     )),
                     alphanumeric1.map(|s: &str| Signal(s)),
                 )),
@@ -85,12 +117,61 @@ fn parse(input: &str) -> IResult<&str, (HashMap<Signal, bool>, Vec<Gate>)> {
     Ok((input, (initial_map.into_iter().collect(), gates)))
 }
 
+fn evaluate_dag<'a>(
+    initial_signals: &'a HashMap<Signal<'a>, bool>,
+    gates: Vec<Gate<'a>>,
+) -> HashMap<Signal<'a>, bool> {
+    let mut signals = initial_signals.clone();
+
+    let mut open_list_gates: VecDeque<Gate> = gates.into();
+
+    while open_list_gates.is_empty().not() {
+        if let Some(pos) = open_list_gates
+            .iter()
+            .position(|g| signals.contains_key(&g.in_1) && signals.contains_key(&g.in_2))
+        {
+            let gate = open_list_gates.remove(pos).unwrap();
+            let signal_in_1 = &gate.in_1;
+            let signal_in_2 = &gate.in_2;
+            let op = &gate.op;
+            let in_1 = signals[&signal_in_1];
+            let in_2 = signals[&signal_in_2];
+
+            let out = gate.eval(in_1, in_2);
+            signals.insert(gate.out.clone(), out);
+            info!(
+                "evaluated {} {} {} = {:?} ==> {} {} {} = {}",
+                signal_in_1.0, op, signal_in_2.0, gate.out.0, in_1, op, in_2, out
+            )
+        }
+    }
+
+    signals
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_process() -> miette::Result<()> {
+    fn test_process_small_example() -> miette::Result<()> {
+        let input = r#"
+x00: 1
+x01: 1
+x02: 1
+y00: 0
+y01: 1
+y02: 0
+
+x00 AND y00 -> z00
+x01 XOR y01 -> z01
+x02 OR y02 -> z02      "#
+            .trim();
+        assert_eq!("4", process(input)?);
+        Ok(())
+    }
+    #[test]
+    fn test_process_large_example() -> miette::Result<()> {
         let input = r#"
 x00: 1
 x01: 0
@@ -138,8 +219,9 @@ bqk OR frj -> z07
 y03 OR x01 -> nrd
 hwm AND bqk -> z03
 tgd XOR rvg -> z12
-tnw OR pbm -> gnj        "#
-            .trim();
+tnw OR pbm -> gnj
+      "#
+        .trim();
         assert_eq!("2024", process(input)?);
         Ok(())
     }
