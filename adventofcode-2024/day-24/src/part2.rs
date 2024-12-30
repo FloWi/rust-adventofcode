@@ -18,7 +18,7 @@ use tracing::{debug, info};
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
-    let (_, (initial_signals, gates)): (&str, (HashMap<Signal, bool>, Vec<Gate>)) =
+    let (_, (initial_signals, gates)): (&str, (HashMap<&str, bool>, Vec<Gate>)) =
         parse(input).map_err(|e| miette!("parse failed {}", e))?;
 
     // Task is to fix the gates to perform the addition operation correctly.
@@ -37,7 +37,7 @@ pub fn process(input: &str) -> miette::Result<String> {
         .flat_map(|(a, b)| {
             let gate_a: &Gate = &gates[*a];
             let gate_b: &Gate = &gates[*b];
-            vec![gate_a.out.0, gate_b.out.0]
+            vec![gate_a.out.to_string(), gate_b.out.to_string()]
         })
         .sorted()
         .join(",");
@@ -80,9 +80,51 @@ pub fn process(input: &str) -> miette::Result<String> {
     Ok(z_decimal_actual.to_string())
 }
 
+fn set_input_number(label: char, value: u64, map: &mut HashMap<&str, bool>) {
+    let num_bits = map.keys().filter(|k| k.starts_with(label)).count();
+    let bits = format!("{value:b}").chars().collect_vec();
+
+    // claude.ai came up with this. The borrow checker was driving me crazy with the stupid &str lifetimes.
+    // apparently you can't update a hashmap in a loop, when you calculate the key of type &str inside that loop.
+    // First collect all the keys we need to update
+    let updates: Vec<_> = (0..num_bits)
+        .map(|idx| format!("{label}{idx:02}"))
+        .collect();
+
+    // Then update them
+    for (idx, key) in updates.iter().enumerate() {
+        let bit_char = if idx >= bits.len() {
+            &'0'
+        } else {
+            bits.get(bits.len() - idx - 1).unwrap_or(&'0')
+        };
+        let bit_value = *bit_char == '1';
+        if let Some(bit) = map.get_mut(key.as_str()) {
+            *bit = bit_value;
+        }
+    }
+}
+
+fn check_basic_functionality(gates: &[Gate], initial_map: &HashMap<&str, bool>) {
+    let num_x_bits = initial_map.keys().filter(|k| k.starts_with("x")).count();
+    let num_y_bits = initial_map.keys().filter(|k| k.starts_with("y")).count();
+    let num_z_bits = initial_map.keys().filter(|k| k.starts_with("z")).count();
+
+    assert_eq!(num_x_bits, num_y_bits);
+    assert_eq!(num_z_bits, num_x_bits + 1);
+
+    // set x to 1;
+    let mut map: HashMap<&str, bool> = initial_map.clone();
+
+    let numbers_to_check = (1..=num_x_bits).for_each(|idx| {
+        let y = 2u64.pow(idx as u32);
+        let binary = format!("{y:b}");
+    });
+}
+
 fn find_swaps(
     gates: &[Gate],
-    initial_map: &HashMap<Signal, bool>,
+    initial_map: &HashMap<&str, bool>,
     expected_binary: &str,
     broken_ranges: &Vec<RangeInclusive<usize>>,
 ) {
@@ -101,9 +143,10 @@ fn find_swaps(
                 map.remove(&g.out);
             }
             let new_map = evaluate_dag(&map, &gates);
-            swap(&mut gates, idx_2, idx_1);
             let (z_binary, z_decimal) =
                 read_binary_number_from_register_starting_with_char("z", &new_map);
+
+            swap(&mut gates, idx_2, idx_1);
 
             if z_binary.len() == expected_binary.len() {
                 let diffs = find_broken_ranges_in_bit_string(&z_binary, expected_binary);
@@ -147,15 +190,15 @@ fn swap(gates: &mut Vec<Gate>, idx_1: usize, idx_2: usize) {
     }
 }
 
-fn render_graph(gates: &[Gate], current_map: &HashMap<Signal, bool>) {
-    let node_names = gates
+fn render_graph(gates: &[Gate], current_map: &HashMap<&str, bool>) {
+    let node_names: HashMap<&str, String> = gates
         .iter()
         .map(|gate| {
             (
                 gate.out.clone(),
                 format!(
                     "{}\n{}",
-                    gate.out.0,
+                    gate.out,
                     match gate.op {
                         Operator::AND => "AND",
                         Operator::OR => "OR",
@@ -164,7 +207,9 @@ fn render_graph(gates: &[Gate], current_map: &HashMap<Signal, bool>) {
                 ),
             )
         })
-        .collect::<HashMap<Signal, String>>();
+        .collect::<HashMap<&str, String>>();
+
+    // Create edges with owned Strings instead of references
     let edges = gates
         .iter()
         .flat_map(
@@ -175,23 +220,24 @@ fn render_graph(gates: &[Gate], current_map: &HashMap<Signal, bool>) {
                  out,
              }| {
                 [in_1, in_2]
-                    .iter()
+                    .into_iter()
                     .map(|input| {
                         (
-                            node_names.get(input).map(|v| v.as_str()).unwrap_or(input.0),
-                            node_names.get(out).map(|v| v.as_str()).unwrap_or(out.0),
+                            node_names.get(input).map(|v| v.as_str()).unwrap_or(input),
+                            node_names.get(out).map(|v| v.as_str()).unwrap_or(out),
                             current_map.get(input).unwrap(),
                         )
                     })
                     .collect::<Vec<_>>()
             },
         )
-        .collect::<Vec<_>>();
-    let g = &DiGraphMap::<&str, &bool>::from_edges(&edges);
+        .collect_vec();
+
+    // Create the graph with owned Strings
+    let g = DiGraphMap::<&str, bool>::from_edges(edges);
 
     println!("{}", Dot::with_config(&g, &[]));
 }
-
 fn find_broken_ranges_in_bit_string(actual: &str, expected: &str) -> Vec<RangeInclusive<usize>> {
     /*
                   idx: 543210987|65|4321098765|43210987|654|321|0|9876543210
@@ -219,12 +265,12 @@ fn find_broken_ranges_in_bit_string(actual: &str, expected: &str) -> Vec<RangeIn
 
 fn read_binary_number_from_register_starting_with_char(
     starts_with_pattern: &str,
-    signals: &HashMap<Signal, bool>,
+    signals: &HashMap<&str, bool>,
 ) -> (String, u64) {
     let binary: String = signals
         .into_iter()
-        .filter(|(key, _)| key.0.starts_with(starts_with_pattern))
-        .sorted_by_key(|(key, _)| key.0)
+        .filter(|(key, _)| key.starts_with(starts_with_pattern))
+        .sorted_by_key(|(key, _)| key.clone())
         .rev() // most significant bit first
         .map(|(_, value)| (*value as u8).to_string())
         .collect();
@@ -232,9 +278,6 @@ fn read_binary_number_from_register_starting_with_char(
     let result = u64::from_str_radix(&binary, 2).unwrap();
     (binary, result)
 }
-
-#[derive(Eq, PartialEq, Hash, Debug, Clone)]
-struct Signal<'a>(&'a str);
 
 #[derive(Debug, Clone)]
 enum Operator {
@@ -256,13 +299,13 @@ impl Display for Operator {
 
 #[derive(Debug, Clone)]
 struct Gate<'a> {
-    in_1: Signal<'a>,
-    in_2: Signal<'a>,
+    in_1: &'a str,
+    in_2: &'a str,
     op: Operator,
-    out: Signal<'a>,
+    out: &'a str,
 }
 
-impl<'a> Gate<'a> {
+impl Gate<'_> {
     pub(crate) fn eval(&self, in1: bool, in2: bool) -> bool {
         match self.op {
             Operator::XOR => in1.bitxor(in2),
@@ -272,11 +315,11 @@ impl<'a> Gate<'a> {
     }
 }
 
-fn parse(input: &str) -> IResult<&str, (HashMap<Signal, bool>, Vec<Gate>)> {
+fn parse(input: &str) -> IResult<&str, (HashMap<&str, bool>, Vec<Gate>)> {
     let (input, initial_map) = separated_list1(
         line_ending,
         separated_pair(
-            alphanumeric1.map(|s: &str| Signal(s)),
+            alphanumeric1,
             tag(": "),
             complete::u8.map(|num| match num {
                 1 => true,
@@ -295,16 +338,16 @@ fn parse(input: &str) -> IResult<&str, (HashMap<Signal, bool>, Vec<Gate>)> {
             line_ending,
             separated_pair(
                 tuple((
-                    alphanumeric1.map(|s: &str| Signal(s)),
+                    alphanumeric1,
                     alt((
                         value(Operator::AND, tag(" AND ")),
                         value(Operator::OR, tag(" OR ")),
                         value(Operator::XOR, tag(" XOR ")),
                     )),
-                    alphanumeric1.map(|s: &str| Signal(s)),
+                    alphanumeric1,
                 )),
                 tag(" -> "),
-                alphanumeric1.map(|s: &str| Signal(s)),
+                alphanumeric1,
             )
             .map(|((in_1, op, in_2), out)| Gate {
                 in_1,
@@ -319,9 +362,9 @@ fn parse(input: &str) -> IResult<&str, (HashMap<Signal, bool>, Vec<Gate>)> {
 }
 
 fn evaluate_dag<'a>(
-    initial_signals: &'a HashMap<Signal<'a>, bool>,
-    gates: &[Gate<'a>],
-) -> HashMap<Signal<'a>, bool> {
+    initial_signals: &'a HashMap<&'a str, bool>,
+    gates: &'a [Gate<'a>],
+) -> HashMap<&'a str, bool> {
     let mut signals = initial_signals.clone();
 
     let mut open_list_gates: VecDeque<Gate> = VecDeque::from_iter(gates.into_iter().cloned());
@@ -335,14 +378,14 @@ fn evaluate_dag<'a>(
             let signal_in_1 = &gate.in_1;
             let signal_in_2 = &gate.in_2;
             let op = &gate.op;
-            let in_1 = signals[&signal_in_1];
-            let in_2 = signals[&signal_in_2];
+            let in_1 = signals[signal_in_1];
+            let in_2 = signals[signal_in_2];
 
             let out = gate.eval(in_1, in_2);
             signals.insert(gate.out.clone(), out);
             info!(
                 "evaluated {} {} {} = {:?} ==> {} {} {} = {}",
-                signal_in_1.0, op, signal_in_2.0, gate.out.0, in_1, op, in_2, out
+                signal_in_1, op, signal_in_2, gate.out, in_1, op, in_2, out
             )
         } else {
             debug!("No open pos found");
@@ -374,6 +417,35 @@ x02 OR y02 -> z02      "#
         assert_eq!("4", process(input)?);
         Ok(())
     }
+
+    #[test]
+    fn test_set_and_read_number() -> miette::Result<()> {
+        let input = r#"
+x00: 1
+x01: 0
+x02: 1
+x03: 1
+x04: 0
+y00: 1
+y01: 1
+y02: 1
+y03: 1
+y04: 1
+
+ntg XOR fgs -> mjb"#
+            .trim();
+
+        let (_, (mut signals, _)) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
+
+        for i in 0..32 {
+            set_input_number('x', i, &mut signals);
+            let (_, result) = read_binary_number_from_register_starting_with_char("x", &signals);
+            assert_eq!(result, i);
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn test_process_large_example() -> miette::Result<()> {
         let input = r#"
