@@ -12,9 +12,11 @@ use nom::{IResult, Parser};
 use petgraph::dot::Dot;
 use petgraph::prelude::DiGraphMap;
 use std::collections::{HashMap, VecDeque};
+use std::convert::identity;
 use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitOr, BitXor, Not, RangeInclusive};
 use tracing::{debug, info};
+use tracing_subscriber::fmt::format;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
@@ -26,23 +28,46 @@ pub fn process(input: &str) -> miette::Result<String> {
 
     let mut gates = gates;
 
-    let manual_swaps = vec![(78, 131), (140, 142), (2, 58), (20, 60)];
-    //let manual_swaps = vec![(64, 78), (20, 110), (106, 142)];
-    for (a, b) in manual_swaps.iter() {
-        swap(&mut gates, *a, *b);
-    }
+    // // causes a fix in 2^10 and 2^11
+    //swap(&mut gates, 44, 78);
+    //
+    // // causes a fix in 2^14 and 2^15
+    // swap(&mut gates, 53, 140);
+    //
+    // // causes a fix in 2^26 and 2^27
+    // // swap(&mut gates, 20, 156);
+    // swap(&mut gates, 60, 206);
+    // // swap(&mut gates, 110, 182);
 
-    let wires_affected_by_swaps = manual_swaps
-        .iter()
-        .flat_map(|(a, b)| {
-            let gate_a: &Gate = &gates[*a];
-            let gate_b: &Gate = &gates[*b];
-            vec![gate_a.out.to_string(), gate_b.out.to_string()]
-        })
-        .sorted()
-        .join(",");
+    // 2^34; x: 17179869183; y: 1; is_broken: true; z_decimal_expected: 17179869184; z_decimal_actual: 34359738368; z_binary_actual: 0000000000100000000000000000000000000000000000; z_binary_expected: 0000000000010000000000000000000000000000000000
+    // found 5 swap-combinations that improve the result
+    // num_diffs: 0; diffs: []; idx_1: 19; idx_2: 45; z_binary: 0000000000010000000000000000000000000000000000; z_decimal: 17179869184
+    // num_diffs: 0; diffs: []; idx_1: 45; idx_2: 58; z_binary: 0000000000010000000000000000000000000000000000; z_decimal: 17179869184
+    // num_diffs: 0; diffs: []; idx_1: 45; idx_2: 99; z_binary: 0000000000010000000000000000000000000000000000; z_decimal: 17179869184
+    // num_diffs: 0; diffs: []; idx_1: 45; idx_2: 111; z_binary: 0000000000010000000000000000000000000000000000; z_decimal: 17179869184
+    // num_diffs: 0; diffs: []; idx_1: 45; idx_2: 192; z_binary: 0000000000010000000000000000000000000000000000; z_decimal: 17179869184
 
-    println!("wires_affected_by_swaps: {wires_affected_by_swaps}");
+    // causes a fix in last entry 2^34
+    // swap(&mut gates, 19, 45);
+    // swap(&mut gates, 45, 58);
+    // swap(&mut gates, 45, 99);
+    // swap(&mut gates, 45, 111);
+    // swap(&mut gates, 45, 192);
+
+    // idx_1: 64;  idx_2: 78;
+    // idx_1: 78;  idx_2: 131;
+    //
+    // let wires_affected_by_swaps = manual_swaps
+    //     .iter()
+    //     .flat_map(|(a, b)| {
+    //         let gate_a: &Gate = &gates[*a];
+    //         let gate_b: &Gate = &gates[*b];
+    //         vec![gate_a.out.to_string(), gate_b.out.to_string()]
+    //     })
+    //     .sorted()
+    //     .join(",");
+    //
+    // println!("wires_affected_by_swaps: {wires_affected_by_swaps}");
 
     let final_signals = evaluate_dag(&initial_signals, &gates);
 
@@ -68,14 +93,18 @@ pub fn process(input: &str) -> miette::Result<String> {
     println!("          z_binary: {z_binary}");
     println!(" z_binary_expected: {z_binary_expected}");
 
-    let broken_ranges: Vec<RangeInclusive<usize>> =
-        find_broken_ranges_in_bit_string(&z_binary, &z_binary_expected);
+    let is_match = z_decimal_expected == z_decimal_actual;
+    println!("did I fix it? {is_match}");
 
-    println!("broken_ranges: {:?}", broken_ranges);
+    // let broken_ranges: Vec<RangeInclusive<usize>> =
+    //     find_broken_ranges_in_bit_string(&z_binary, &z_binary_expected);
+    //
+    // println!("broken_ranges: {:?}", broken_ranges);
 
     //render_graph(&gates, &final_signals);
 
-    find_swaps(&gates, &initial_signals, &z_binary_expected, &broken_ranges);
+    //find_swaps(&gates, &initial_signals, &z_binary_expected, &broken_ranges);
+    check_basic_functionality(&gates, &initial_signals, x_decimal, y_decimal);
 
     Ok(z_decimal_actual.to_string())
 }
@@ -105,21 +134,102 @@ fn set_input_number(label: char, value: u64, map: &mut HashMap<&str, bool>) {
     }
 }
 
-fn check_basic_functionality(gates: &[Gate], initial_map: &HashMap<&str, bool>) {
+fn check_basic_functionality(
+    gates: &[Gate],
+    initial_map: &HashMap<&str, bool>,
+    x_real_decimal: u64,
+    y_real_decimal: u64,
+) {
     let num_x_bits = initial_map.keys().filter(|k| k.starts_with("x")).count();
     let num_y_bits = initial_map.keys().filter(|k| k.starts_with("y")).count();
-    let num_z_bits = initial_map.keys().filter(|k| k.starts_with("z")).count();
+    let num_z_bits = gates.iter().filter(|g| g.out.starts_with("z")).count();
 
     assert_eq!(num_x_bits, num_y_bits);
-    assert_eq!(num_z_bits, num_x_bits + 1);
 
     // set x to 1;
     let mut map: HashMap<&str, bool> = initial_map.clone();
+    let y = 1;
+    set_input_number('y', y, &mut map);
 
-    let numbers_to_check = (1..=num_x_bits).for_each(|idx| {
-        let y = 2u64.pow(idx as u32);
-        let binary = format!("{y:b}");
-    });
+    let result = check_for_brokenness(
+        "real_input".to_string(),
+        x_real_decimal,
+        y_real_decimal,
+        &mut map,
+        gates,
+    );
+
+    let broken = (0..=num_x_bits)
+        .map(|exp| {
+            let x = 2u64.pow(exp as u32) - 1;
+
+            let res_1 = check_for_brokenness(format!("2^{exp} -1"), x, y, &mut map, gates);
+            res_1
+
+            // println!("2^{exp}; x: {x}; y: {y}; is_broken: {is_broken}; z_decimal_expected: {z_decimal_expected}; z_decimal_actual: {z_decimal_actual}; z_binary_actual: {z_binary_actual}; z_binary_expected: {z_binary_expected}");
+            //
+            // if is_broken {
+            //     let broken_ranges =
+            //         find_broken_ranges_in_bit_string(&z_binary_actual, &z_binary_expected);
+            //     find_swaps(&gates, &map, &z_binary_expected, &broken_ranges);
+            // }
+        })
+        .chain(vec![result])
+        .filter_map(identity)
+        .collect_vec();
+
+    println!("found {} broken testcases", broken.len());
+    dbg!(broken);
+}
+
+#[derive(Debug)]
+struct BrokenTestResult {
+    label: String,
+    x: u64,
+    y: u64,
+    z_decimal_expected: u64,
+    z_decimal_actual: u64,
+    z_binary_expected: String,
+    z_binary_actual: String,
+}
+
+fn check_for_brokenness<'a>(
+    label: String,
+    x: u64,
+    y: u64,
+    map: &mut HashMap<&'a str, bool>,
+    gates: &[Gate<'a>],
+) -> Option<BrokenTestResult> {
+    set_input_number('x', x, map);
+    set_input_number('y', y, map);
+    //clear signals
+    for g in gates.iter() {
+        map.remove(&g.out);
+    }
+
+    let z_decimal_expected = x + y;
+    let final_signals = evaluate_dag(&map, &gates);
+
+    let (z_binary_actual, z_decimal_actual) =
+        read_binary_number_from_register_starting_with_char("z", &final_signals);
+
+    let z_binary_expected = format!(
+        "{:0>width$b}",
+        z_decimal_expected,
+        width = z_binary_actual.len()
+    );
+
+    let is_broken = z_decimal_actual != z_decimal_expected;
+
+    is_broken.then_some(BrokenTestResult {
+        label,
+        x,
+        y,
+        z_decimal_expected,
+        z_decimal_actual,
+        z_binary_expected,
+        z_binary_actual,
+    })
 }
 
 fn find_swaps(
