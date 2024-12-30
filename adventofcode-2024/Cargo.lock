@@ -590,6 +590,7 @@ dependencies = [
  "itertools",
  "miette",
  "nom",
+ "petgraph",
  "rstest",
  "test-log",
  "tracing",
