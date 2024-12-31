@@ -11,7 +11,7 @@ use nom::sequence::{preceded, separated_pair, tuple};
 use nom::{IResult, Parser};
 use petgraph::dot::Dot;
 use petgraph::prelude::DiGraphMap;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::identity;
 use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitOr, BitXor, Not, RangeInclusive};
@@ -101,12 +101,328 @@ pub fn process(input: &str) -> miette::Result<String> {
     //
     // println!("broken_ranges: {:?}", broken_ranges);
 
+    let mut signals = initial_signals.clone();
     //render_graph(&gates, &final_signals);
 
-    //find_swaps(&gates, &initial_signals, &z_binary_expected, &broken_ranges);
-    check_basic_functionality(&gates, &initial_signals, x_decimal, y_decimal);
+    let num_x_bits = signals.keys().filter(|k| k.starts_with("x")).count();
+    let num_y_bits = signals.keys().filter(|k| k.starts_with("y")).count();
 
+    let testcases = (0..num_x_bits)
+        .flat_map(|exp| {
+            let x = 0;
+            let y = 2u64.pow(exp as u32);
+
+            vec![(format!("0 + 2^{exp}"), x, y)]
+        })
+        .chain(vec![("real_input".to_string(), x_decimal, y_decimal)])
+        .collect_vec();
+
+    fix_gates(&gates, &mut signals, testcases);
     Ok(z_decimal_actual.to_string())
+}
+
+fn determine_gate_connections<'a>(
+    broken_bit_range: RangeInclusive<usize>,
+    gates: &'a [Gate<'a>],
+    signals: &mut HashMap<&'a str, bool>,
+) -> HashSet<Gate<'a>> {
+    let lower_bit_idx = broken_bit_range.clone().min().unwrap();
+    let higher_bit_idx = broken_bit_range.max().unwrap();
+    assert_eq!(higher_bit_idx - lower_bit_idx, 1);
+
+    let x_label = format!("x{lower_bit_idx:02}");
+    let z_label_lower = format!("z{lower_bit_idx:02}");
+    let z_label_higher = format!("z{higher_bit_idx:02}");
+
+    let gates_connected_from_lower_input_x =
+        find_gates_connected_down_from_signal(x_label.clone(), gates);
+
+    let gates_connected_to_lower_output =
+        find_gates_connected_up_from_output(z_label_lower.clone(), gates);
+    let gates_connected_to_higher_output =
+        find_gates_connected_up_from_output(z_label_higher.clone(), gates);
+
+    let gates_propagating_to_outputs = gates_connected_to_lower_output
+        .union(&gates_connected_to_higher_output)
+        .cloned()
+        .collect::<HashSet<_>>();
+
+    let relevant_gates = [
+        gates_connected_from_lower_input_x.clone(),
+        gates_propagating_to_outputs.clone(),
+    ]
+    .iter()
+    .cloned()
+    .reduce(|a, b| a.intersection(&b).cloned().collect())
+    .unwrap_or_default();
+
+    println!(
+        "{x_label} propagates to {} gates",
+        gates_connected_from_lower_input_x.len()
+    );
+    println!(
+        "{z_label_lower} {z_label_higher} propagate from {} gates",
+        gates_propagating_to_outputs.len()
+    );
+    println!("Overlap: {} gates", &relevant_gates.len());
+    //dbg!(relevant_gates);
+
+    relevant_gates
+}
+
+fn find_gates_connected_down_from_signal<'a>(
+    label: String,
+    gates: &'a [Gate<'a>],
+) -> HashSet<Gate<'a>> {
+    println!("find_gates_connected_down_from_signal(label: {label})");
+
+    let mut open_list = VecDeque::from([label]);
+    let mut affected_gates: HashSet<Gate> = HashSet::new();
+    while let Some(current) = open_list.pop_front() {
+        let relevant_gates: HashSet<Gate> = gates
+            .iter()
+            .filter(|g| g.in_1 == current || g.in_2 == current)
+            .cloned()
+            .collect();
+        for g in relevant_gates.iter() {
+            affected_gates.insert(g.clone());
+            open_list.push_back(g.out.to_string())
+        }
+    }
+
+    affected_gates
+}
+
+fn find_gates_connected_up_from_output<'a>(
+    label: String,
+    gates: &'a [Gate<'a>],
+) -> HashSet<Gate<'a>> {
+    println!("find_gates_connected_up_from_output(label: {label})");
+
+    let mut open_list = VecDeque::from([label]);
+    let mut affected_gates: HashSet<Gate> = HashSet::new();
+    while let Some(current) = open_list.pop_front() {
+        let relevant_gates: HashSet<Gate> =
+            gates.iter().filter(|g| g.out == current).cloned().collect();
+        for g in relevant_gates.iter() {
+            affected_gates.insert(g.clone());
+            open_list.push_back(g.in_1.to_string());
+            open_list.push_back(g.in_2.to_string());
+        }
+    }
+
+    affected_gates
+}
+
+fn fix_gates<'a>(
+    gates: &'a [Gate<'a>],
+    initial_map: &mut HashMap<&'a str, bool>,
+    testcases: Vec<(String, u64, u64)>,
+) {
+    let (_, total_num_wrong_bits) =
+        run_testcases_and_count_total_number_of_wrong_bits(&gates, initial_map, &testcases);
+
+    find_swaps(&gates, initial_map, total_num_wrong_bits, &testcases);
+}
+
+fn find_swaps<'a>(
+    original_gates: &'a [Gate<'a>],
+    signals: &mut HashMap<&'a str, bool>,
+    total_num_wrong_bits: usize,
+    testcases: &[(String, u64, u64)],
+) {
+    let mut gates: Vec<Gate<'a>> = original_gates.iter().cloned().collect_vec();
+
+    let (baseline_broken_results, baseline_current_total_num_wrong_bits) =
+        run_testcases_and_count_total_number_of_wrong_bits(&gates, signals, testcases);
+
+    println!("Trying to find swaps. baseline_current_total_num_wrong_bits: {baseline_current_total_num_wrong_bits}");
+    for b @ BrokenTestResult {
+        label,
+        x,
+        y,
+        z_decimal_expected,
+        z_decimal_actual,
+        z_binary_expected,
+        z_binary_actual,
+        broken_ranges,
+    } in baseline_broken_results.iter()
+    {
+        let total_bits_wrong = b.total_bits_wrong();
+        println!("label: {label}; num_bits_wrong: {total_bits_wrong}; broken_ranges: {broken_ranges:?}; x: {x}; y: {y}; z_decimal_expected: {z_decimal_expected}; z_decimal_actual: {z_decimal_actual}; z_binary_expected: {z_binary_expected}; z_binary_actual: {z_binary_actual}");
+    }
+
+    let swap_candidates_per_bit: Vec<Vec<(usize, Gate)>> = baseline_broken_results
+        .iter()
+        .filter(|b| b.broken_ranges.len() == 1)
+        .map(|broken_case| {
+            let range = broken_case.broken_ranges.iter().next().unwrap();
+            determine_gate_connections(range.clone(), &original_gates, signals)
+                .into_iter()
+                .map(|g| {
+                    let idx = original_gates.iter().position(|g2| &g == g2).unwrap();
+                    (idx, g)
+                })
+                .collect_vec()
+        })
+        .collect_vec();
+
+    println!(
+        "Found swap candidates for {} bits.",
+        swap_candidates_per_bit.len()
+    );
+    for swap_candidates in swap_candidates_per_bit.iter() {
+        let swap_candidates_str = swap_candidates
+            .iter()
+            .map(|(idx, g)| format!("{idx}({})", g.out))
+            .join(", ");
+        println!(
+            "{} swap_candidates: {}",
+            swap_candidates.len(),
+            swap_candidates_str
+        );
+    }
+
+    let swaps_groups = swap_candidates_per_bit
+        .iter()
+        .map(|swaps| {
+            swaps
+                .into_iter()
+                .map(|(idx, _)| idx)
+                .tuple_combinations()
+                .collect::<Vec<(_, _)>>()
+        })
+        .collect_vec();
+
+    for (idx, swap_group) in swaps_groups.iter().enumerate() {
+        println!(
+            "#{idx} swap_group.len() = {} - {:?}",
+            swap_group.len(),
+            swap_group
+        )
+    }
+
+    let total_swap_combinations = swaps_groups.iter().multi_cartesian_product().count();
+
+    println!("Found {total_swap_combinations} total swap combinations");
+    println!("Checking against baseline of {baseline_current_total_num_wrong_bits} broken bits");
+
+    let improving_swap_combinations_per_bit = swaps_groups
+        .iter()
+        .map(|swaps| {
+            swaps
+                .into_iter()
+                .filter(|((swap_from, swap_to))| {
+                    swap(&mut gates, **swap_from, **swap_to);
+                    let (new_result, new_total_number_of_broken_bits) =
+                        run_testcases_and_count_total_number_of_wrong_bits(
+                            &gates, signals, testcases,
+                        );
+                    swap(&mut gates, **swap_to, **swap_from);
+                    let has_improved =
+                        new_total_number_of_broken_bits < baseline_current_total_num_wrong_bits;
+                    has_improved
+                })
+                .collect_vec()
+        })
+        .collect_vec();
+
+    for (idx, swap_group) in improving_swap_combinations_per_bit.iter().enumerate() {
+        println!(
+            "#{idx} improving_swap_group.len() = {} - {:?}",
+            swap_group.len(),
+            swap_group
+        )
+    }
+
+    let total_improving_swap_combinations = improving_swap_combinations_per_bit
+        .iter()
+        .multi_cartesian_product()
+        .count();
+
+    println!("Found {total_improving_swap_combinations} improving_swap_combinations");
+
+    for (idx, swaps) in improving_swap_combinations_per_bit
+        .iter()
+        .multi_cartesian_product()
+        .enumerate()
+    {
+        for (swap_from, swap_to) in &swaps {
+            swap(&mut gates, **swap_from, **swap_to);
+        }
+        let (_, new_total_number_of_broken_bits) =
+            run_testcases_and_count_total_number_of_wrong_bits(&gates, signals, testcases);
+        for (swap_from, swap_to) in &swaps {
+            swap(&mut gates, **swap_to, **swap_from);
+        }
+
+        if new_total_number_of_broken_bits == 0 {
+            println!("WOOHOO found solution after {} checks: {swaps:?}", idx + 1)
+        }
+    }
+
+    //
+    // all_broken_gates
+    //     .iter()
+    //     .tuple_combinations()
+    //     .enumerate()
+    //     .for_each(|(idx, (g1, g2, g3, g4))| {
+    //         let result =
+    //             run_testcases_and_count_total_number_of_wrong_bits(&gates, signals, testcases);
+    //
+    //         println!(
+    //             "#{idx}: swap {}-{} and {}-{}: broken bits: {}",
+    //             g1.out, g2.out, g3.out, g4.out, result.1
+    //         );
+    //
+    //         if result.1 == 0 {
+    //             println!("found solution!!!");
+    //         }
+    //     });
+    //
+    // dbg!(all_broken_gates);
+
+    todo!();
+
+    let mut improvements = Vec::with_capacity(100);
+    let total_num_combinations = (0..gates.len()).tuple_combinations::<(_, _)>().count();
+
+    (0..gates.len())
+        .tuple_combinations()
+        .enumerate()
+        .for_each(|(n, (idx_1, idx_2))| {
+            if n.rem_euclid(1000) == 0 {
+                println!("# {n} of {total_num_combinations}")
+            }
+            //println!("Swapping {idx_1} and {idx_2}");
+            swap(&mut gates, idx_1, idx_2);
+
+            let (broken_ranges, current_total_num_wrong_bits) =
+                run_testcases_and_count_total_number_of_wrong_bits(&gates, signals, testcases);
+
+            swap(&mut gates, idx_2, idx_1);
+
+            if current_total_num_wrong_bits < total_num_wrong_bits {
+                improvements.push((idx_1, idx_2, current_total_num_wrong_bits, broken_ranges))
+            }
+        });
+
+    println!(
+        "found {} swap-combinations that improve the result",
+        improvements.len()
+    );
+    for (idx_1, idx_2, num_wrong_bits, broken_ranges) in
+        improvements
+            .iter()
+            .sorted_by_key(|(idx_1, idx_2, num_wrong_bits, broken_ranges)| {
+                (num_wrong_bits, idx_1, idx_2)
+            })
+    {
+        println!(
+            "num_diffs: {}; diffs: {broken_ranges:?}; num_wrong_bits: {num_wrong_bits}; idx_1: {idx_1}; idx_2: {idx_2}",
+            broken_ranges.len()
+        );
+    }
 }
 
 fn set_input_number(label: char, value: u64, map: &mut HashMap<&str, bool>) {
@@ -134,52 +450,41 @@ fn set_input_number(label: char, value: u64, map: &mut HashMap<&str, bool>) {
     }
 }
 
-fn check_basic_functionality(
-    gates: &[Gate],
-    initial_map: &HashMap<&str, bool>,
-    x_real_decimal: u64,
-    y_real_decimal: u64,
-) {
-    let num_x_bits = initial_map.keys().filter(|k| k.starts_with("x")).count();
-    let num_y_bits = initial_map.keys().filter(|k| k.starts_with("y")).count();
+fn run_testcases_and_count_total_number_of_wrong_bits<'a>(
+    gates: &[Gate<'a>],
+    map: &mut HashMap<&'a str, bool>,
+    testcases: &[(String, u64, u64)],
+) -> (Vec<BrokenTestResult>, usize) {
+    let num_x_bits = map.keys().filter(|k| k.starts_with("x")).count();
+    let num_y_bits = map.keys().filter(|k| k.starts_with("y")).count();
     let num_z_bits = gates.iter().filter(|g| g.out.starts_with("z")).count();
 
     assert_eq!(num_x_bits, num_y_bits);
 
-    // set x to 1;
-    let mut map: HashMap<&str, bool> = initial_map.clone();
-    let y = 1;
-    set_input_number('y', y, &mut map);
-
-    let result = check_for_brokenness(
-        "real_input".to_string(),
-        x_real_decimal,
-        y_real_decimal,
-        &mut map,
-        gates,
-    );
-
-    let broken = (0..=num_x_bits)
-        .map(|exp| {
-            let x = 2u64.pow(exp as u32) - 1;
-
-            let res_1 = check_for_brokenness(format!("2^{exp} -1"), x, y, &mut map, gates);
-            res_1
-
-            // println!("2^{exp}; x: {x}; y: {y}; is_broken: {is_broken}; z_decimal_expected: {z_decimal_expected}; z_decimal_actual: {z_decimal_actual}; z_binary_actual: {z_binary_actual}; z_binary_expected: {z_binary_expected}");
-            //
-            // if is_broken {
-            //     let broken_ranges =
-            //         find_broken_ranges_in_bit_string(&z_binary_actual, &z_binary_expected);
-            //     find_swaps(&gates, &map, &z_binary_expected, &broken_ranges);
-            // }
-        })
-        .chain(vec![result])
-        .filter_map(identity)
+    let broken = testcases
+        .into_iter()
+        .filter_map(|(label, x, y)| check_for_brokenness(label.to_string(), *x, *y, map, gates))
         .collect_vec();
 
-    println!("found {} broken testcases", broken.len());
-    dbg!(broken);
+    info!("found {} broken testcases", broken.len());
+    for b @ BrokenTestResult {
+        label,
+        x,
+        y,
+        z_decimal_expected,
+        z_decimal_actual,
+        z_binary_expected,
+        z_binary_actual,
+        ..
+    } in broken.iter()
+    {
+        let total_bits_wrong = b.total_bits_wrong();
+        info!("label: {label}; num_bits_wrong: {total_bits_wrong}; x: {x}; y: {y}; z_decimal_expected: {z_decimal_expected}; z_decimal_actual: {z_decimal_actual}; z_binary_expected: {z_binary_expected}; z_binary_actual: {z_binary_actual}");
+    }
+
+    let total_num_broken_bits = broken.iter().map(|b| b.total_bits_wrong()).sum();
+
+    (broken, total_num_broken_bits)
 }
 
 #[derive(Debug)]
@@ -191,6 +496,16 @@ struct BrokenTestResult {
     z_decimal_actual: u64,
     z_binary_expected: String,
     z_binary_actual: String,
+    broken_ranges: Vec<RangeInclusive<usize>>,
+}
+
+impl BrokenTestResult {
+    pub(crate) fn total_bits_wrong(&self) -> usize {
+        self.broken_ranges
+            .iter()
+            .map(|r| r.try_len().unwrap())
+            .sum()
+    }
 }
 
 fn check_for_brokenness<'a>(
@@ -221,72 +536,19 @@ fn check_for_brokenness<'a>(
 
     let is_broken = z_decimal_actual != z_decimal_expected;
 
-    is_broken.then_some(BrokenTestResult {
-        label,
-        x,
-        y,
-        z_decimal_expected,
-        z_decimal_actual,
-        z_binary_expected,
-        z_binary_actual,
+    is_broken.then(|| {
+        let broken_ranges = find_broken_ranges_in_bit_string(&z_binary_actual, &z_binary_expected);
+        BrokenTestResult {
+            label,
+            x,
+            y,
+            z_decimal_expected,
+            z_decimal_actual,
+            z_binary_expected,
+            z_binary_actual,
+            broken_ranges,
+        }
     })
-}
-
-fn find_swaps(
-    gates: &[Gate],
-    initial_map: &HashMap<&str, bool>,
-    expected_binary: &str,
-    broken_ranges: &Vec<RangeInclusive<usize>>,
-) {
-    let mut gates: Vec<Gate> = gates.into_iter().cloned().collect_vec();
-    let mut map = initial_map.clone();
-
-    let mut improvements = Vec::with_capacity(100);
-
-    (0..gates.len())
-        .tuple_combinations()
-        .for_each(|(idx_1, idx_2)| {
-            //println!("Swapping {idx_1} and {idx_2}");
-            swap(&mut gates, idx_1, idx_2);
-            //clear signals
-            for g in gates.iter() {
-                map.remove(&g.out);
-            }
-            let new_map = evaluate_dag(&map, &gates);
-            let (z_binary, z_decimal) =
-                read_binary_number_from_register_starting_with_char("z", &new_map);
-
-            swap(&mut gates, idx_2, idx_1);
-
-            if z_binary.len() == expected_binary.len() {
-                let diffs = find_broken_ranges_in_bit_string(&z_binary, expected_binary);
-                if diffs.len() < broken_ranges.len() {
-                    if diffs
-                        .iter()
-                        .all(|diff_range| broken_ranges.contains(diff_range))
-                    {
-                        improvements.push((idx_1, idx_2, z_binary, z_decimal, diffs));
-                    }
-                }
-            }
-        });
-
-    println!(
-        "found {} swap-combinations that improve the result",
-        improvements.len()
-    );
-    for (idx_1, idx_2, z_binary, z_decimal, diff_ranges) in
-        improvements
-            .iter()
-            .sorted_by_key(|(idx_1, idx_2, z_binary, z_decimal, diff_ranges)| {
-                (diff_ranges.len(), idx_1, idx_2)
-            })
-    {
-        println!(
-            "num_diffs: {}; diffs: {diff_ranges:?}; idx_1: {idx_1}; idx_2: {idx_2}; z_binary: {z_binary}; z_decimal: {z_decimal}",
-            diff_ranges.len()
-        );
-    }
 }
 
 fn swap(gates: &mut Vec<Gate>, idx_1: usize, idx_2: usize) {
@@ -389,7 +651,7 @@ fn read_binary_number_from_register_starting_with_char(
     (binary, result)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 enum Operator {
     XOR,
     OR,
@@ -407,7 +669,8 @@ impl Display for Operator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
+
 struct Gate<'a> {
     in_1: &'a str,
     in_2: &'a str,
