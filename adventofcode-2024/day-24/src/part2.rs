@@ -244,7 +244,7 @@ fn find_swaps<'a>(
     debug!("Starting find_swaps");
 
     let (baseline_broken_results, baseline_current_total_num_wrong_bits) =
-        run_testcases_and_count_total_number_of_wrong_bits(&gates, signals, testcases);
+        run_testcases_and_count_total_number_of_wrong_bits(&gates, signals, testcases, false);
 
     debug!("Found baseline");
 
@@ -335,7 +335,7 @@ fn find_swaps<'a>(
                     swap(&mut gates, **swap_from, **swap_to);
                     let (new_result, new_total_number_of_broken_bits) =
                         run_testcases_and_count_total_number_of_wrong_bits(
-                            &gates, signals, testcases,
+                            &gates, signals, testcases, false,
                         );
                     swap(&mut gates, **swap_to, **swap_from);
 
@@ -375,7 +375,7 @@ fn find_swaps<'a>(
             swap(&mut gates, **swap_from, **swap_to);
         }
         let (_, new_total_number_of_broken_bits) =
-            run_testcases_and_count_total_number_of_wrong_bits(&gates, signals, testcases);
+            run_testcases_and_count_total_number_of_wrong_bits(&gates, signals, testcases, true);
 
         if new_total_number_of_broken_bits == 0 {
             debug!(
@@ -388,6 +388,7 @@ fn find_swaps<'a>(
                     &gates,
                     signals,
                     &random_testcases,
+                    true,
                 );
             if new_total_number_of_broken_bits == 0 {
                 debug!("found solution after checking random values as well");
@@ -397,8 +398,6 @@ fn find_swaps<'a>(
                         .map(|(from, to)| (**from, **to))
                         .collect_vec(),
                 );
-            } else {
-                debug!("discarding solution after checking random values. Found {new_total_number_of_broken_bits} broken bits");
             }
         }
 
@@ -455,33 +454,21 @@ fn run_testcases_and_count_total_number_of_wrong_bits<'a>(
     gates: &[Gate<'a>],
     map: &mut HashMap<&'a str, bool>,
     testcases: &[(String, u64, u64)],
+    stop_after_first_error: bool,
 ) -> (Vec<BrokenTestResult>, usize) {
     let num_x_bits = map.keys().filter(|k| k.starts_with("x")).count();
     let num_y_bits = map.keys().filter(|k| k.starts_with("y")).count();
-    let num_z_bits = gates.iter().filter(|g| g.out.starts_with("z")).count();
 
     assert_eq!(num_x_bits, num_y_bits);
 
-    let broken = testcases
+    let iter = testcases
         .iter()
-        .filter_map(|(label, x, y)| check_for_brokenness(label.to_string(), *x, *y, map, gates))
-        .collect_vec();
-
-    // //info!("found {} broken testcases", broken.len());
-    // for b @ BrokenTestResult {
-    //     label,
-    //     x,
-    //     y,
-    //     z_decimal_expected,
-    //     z_decimal_actual,
-    //     z_binary_expected,
-    //     z_binary_actual,
-    //     ..
-    // } in broken.iter()
-    // {
-    //     let total_bits_wrong = b.total_bits_wrong();
-    //     info!("label: {label}; num_bits_wrong: {total_bits_wrong}; x: {x}; y: {y}; z_decimal_expected: {z_decimal_expected}; z_decimal_actual: {z_decimal_actual}; z_binary_expected: {z_binary_expected}; z_binary_actual: {z_binary_actual}");
-    // }
+        .filter_map(|(label, x, y)| check_for_brokenness(label.to_string(), *x, *y, map, gates));
+    let broken = if stop_after_first_error {
+        iter.take(1).collect_vec()
+    } else {
+        iter.collect_vec()
+    };
 
     let total_num_broken_bits = broken.iter().map(|b| b.total_bits_wrong()).sum();
 
