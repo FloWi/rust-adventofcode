@@ -17,7 +17,7 @@ use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitOr, BitXor, Not, RangeInclusive};
 use tracing::{debug, info};
 
-#[tracing::instrument]
+#[tracing::instrument(skip(input))]
 pub fn process(input: &str) -> miette::Result<String> {
     let (_, (initial_signals, gates)): (&str, (HashMap<&str, bool>, Vec<Gate>)) =
         parse(input).map_err(|e| miette!("parse failed {}", e))?;
@@ -218,10 +218,7 @@ fn fix_gates<'a>(
     initial_map: &mut HashMap<&'a str, bool>,
     testcases: Vec<(String, u64, u64)>,
 ) -> Option<String> {
-    let (_, total_num_wrong_bits) =
-        run_testcases_and_count_total_number_of_wrong_bits(gates, initial_map, &testcases);
-
-    let correct_swap_indices = find_swaps(gates, initial_map, total_num_wrong_bits, &testcases)?;
+    let correct_swap_indices = find_swaps(gates, initial_map, &testcases)?;
     let affected_indices: HashSet<usize> = correct_swap_indices
         .into_iter()
         .flat_map(|(from, to)| vec![from, to])
@@ -240,16 +237,21 @@ fn fix_gates<'a>(
 fn find_swaps<'a>(
     original_gates: &'a [Gate<'a>],
     signals: &mut HashMap<&'a str, bool>,
-    total_num_wrong_bits: usize,
     testcases: &[(String, u64, u64)],
 ) -> Option<Vec<(usize, usize)>> {
     let mut gates: Vec<Gate<'a>> = original_gates.iter().cloned().collect_vec();
 
+    debug!("Starting find_swaps");
+
     let (baseline_broken_results, baseline_current_total_num_wrong_bits) =
         run_testcases_and_count_total_number_of_wrong_bits(&gates, signals, testcases);
 
+    debug!("Found baseline");
+
     let num_x_bits = signals.keys().filter(|k| k.starts_with("x")).count();
     let random_testcases = generate_random_testcases(100, num_x_bits);
+
+    debug!("generated testcases");
 
     //debug!("{random_testcases:?}");
 
@@ -343,6 +345,8 @@ fn find_swaps<'a>(
         })
         .collect_vec();
 
+    debug!("Found improving_swap_combinations_per_bit");
+
     for (idx, swap_group) in improving_swap_combinations_per_bit.iter().enumerate() {
         debug!(
             "#{idx} improving_swap_group.len() = {} - {:?}",
@@ -363,6 +367,9 @@ fn find_swaps<'a>(
         .multi_cartesian_product()
         .enumerate()
     {
+        if idx.rem_euclid(100) == 0 {
+            debug!("Checking swap_pairs #{idx}");
+        }
         //swap
         for (swap_from, swap_to) in &swaps {
             swap(&mut gates, **swap_from, **swap_to);
@@ -460,21 +467,21 @@ fn run_testcases_and_count_total_number_of_wrong_bits<'a>(
         .filter_map(|(label, x, y)| check_for_brokenness(label.to_string(), *x, *y, map, gates))
         .collect_vec();
 
-    info!("found {} broken testcases", broken.len());
-    for b @ BrokenTestResult {
-        label,
-        x,
-        y,
-        z_decimal_expected,
-        z_decimal_actual,
-        z_binary_expected,
-        z_binary_actual,
-        ..
-    } in broken.iter()
-    {
-        let total_bits_wrong = b.total_bits_wrong();
-        info!("label: {label}; num_bits_wrong: {total_bits_wrong}; x: {x}; y: {y}; z_decimal_expected: {z_decimal_expected}; z_decimal_actual: {z_decimal_actual}; z_binary_expected: {z_binary_expected}; z_binary_actual: {z_binary_actual}");
-    }
+    // //info!("found {} broken testcases", broken.len());
+    // for b @ BrokenTestResult {
+    //     label,
+    //     x,
+    //     y,
+    //     z_decimal_expected,
+    //     z_decimal_actual,
+    //     z_binary_expected,
+    //     z_binary_actual,
+    //     ..
+    // } in broken.iter()
+    // {
+    //     let total_bits_wrong = b.total_bits_wrong();
+    //     info!("label: {label}; num_bits_wrong: {total_bits_wrong}; x: {x}; y: {y}; z_decimal_expected: {z_decimal_expected}; z_decimal_actual: {z_decimal_actual}; z_binary_expected: {z_binary_expected}; z_binary_actual: {z_binary_actual}");
+    // }
 
     let total_num_broken_bits = broken.iter().map(|b| b.total_bits_wrong()).sum();
 
@@ -624,7 +631,7 @@ fn find_broken_ranges_in_bit_string(actual: &str, expected: &str) -> Vec<RangeIn
             let max = entries.iter().map(|t| t.0).max().unwrap();
             (c, min..=max)
         })
-        .inspect(|t| debug!("{t:?}"))
+        //.inspect(|t| debug!("{t:?}"))
         .filter_map(|t| (!t.0).then_some(t.1))
         .collect_vec()
 }
@@ -750,12 +757,8 @@ fn evaluate_dag<'a>(
 
             let out = gate.eval(in_1, in_2);
             signals.insert(gate.out, out);
-            info!(
-                "evaluated {} {} {} = {:?} ==> {} {} {} = {}",
-                signal_in_1, op, signal_in_2, gate.out, in_1, op, in_2, out
-            )
         } else {
-            debug!("No open pos found");
+            // debug!("No open pos found");
             return signals;
         }
     }
