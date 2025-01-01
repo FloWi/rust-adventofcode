@@ -61,7 +61,7 @@ struct Gate<'a> {
     out: Signal<'a>,
 }
 
-impl<'a> Gate<'a> {
+impl Gate<'_> {
     pub(crate) fn eval(&self, in1: bool, in2: bool) -> bool {
         match self.op {
             Operator::XOR => in1.bitxor(in2),
@@ -134,8 +134,8 @@ fn evaluate_dag<'a>(
             let signal_in_1 = &gate.in_1;
             let signal_in_2 = &gate.in_2;
             let op = &gate.op;
-            let in_1 = signals[&signal_in_1];
-            let in_2 = signals[&signal_in_2];
+            let in_1 = signals[signal_in_1];
+            let in_2 = signals[signal_in_2];
 
             let out = gate.eval(in_1, in_2);
             signals.insert(gate.out.clone(), out);

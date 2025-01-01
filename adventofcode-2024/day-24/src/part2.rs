@@ -11,13 +11,11 @@ use nom::sequence::{preceded, separated_pair, tuple};
 use nom::{IResult, Parser};
 use petgraph::dot::Dot;
 use petgraph::prelude::DiGraphMap;
-use rand::{random, Rng};
+use rand::Rng;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::convert::identity;
 use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitOr, BitXor, Not, RangeInclusive};
 use tracing::{debug, info};
-use tracing_subscriber::fmt::format;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
@@ -27,7 +25,7 @@ pub fn process(input: &str) -> miette::Result<String> {
     // Task is to fix the gates to perform the addition operation correctly.
     // x + y = z
 
-    let mut gates = gates;
+    let gates = gates;
 
     // // causes a fix in 2^10 and 2^11
     //swap(&mut gates, 44, 78);
@@ -186,7 +184,7 @@ fn find_gates_connected_down_from_signal<'a>(
             .cloned()
             .collect();
         for g in relevant_gates.iter() {
-            affected_gates.insert(g.clone());
+            affected_gates.insert(*g);
             open_list.push_back(g.out.to_string())
         }
     }
@@ -206,7 +204,7 @@ fn find_gates_connected_up_from_output<'a>(
         let relevant_gates: HashSet<Gate> =
             gates.iter().filter(|g| g.out == current).cloned().collect();
         for g in relevant_gates.iter() {
-            affected_gates.insert(g.clone());
+            affected_gates.insert(*g);
             open_list.push_back(g.in_1.to_string());
             open_list.push_back(g.in_2.to_string());
         }
@@ -221,9 +219,9 @@ fn fix_gates<'a>(
     testcases: Vec<(String, u64, u64)>,
 ) -> Option<String> {
     let (_, total_num_wrong_bits) =
-        run_testcases_and_count_total_number_of_wrong_bits(&gates, initial_map, &testcases);
+        run_testcases_and_count_total_number_of_wrong_bits(gates, initial_map, &testcases);
 
-    let correct_swap_indices = find_swaps(&gates, initial_map, total_num_wrong_bits, &testcases)?;
+    let correct_swap_indices = find_swaps(gates, initial_map, total_num_wrong_bits, &testcases)?;
     let affected_indices: HashSet<usize> = correct_swap_indices
         .into_iter()
         .flat_map(|(from, to)| vec![from, to])
@@ -275,8 +273,8 @@ fn find_swaps<'a>(
         .iter()
         .filter(|b| b.broken_ranges.len() == 1)
         .map(|broken_case| {
-            let range = broken_case.broken_ranges.iter().next().unwrap();
-            determine_gate_connections(range.clone(), &original_gates, signals)
+            let range = broken_case.broken_ranges.first().unwrap();
+            determine_gate_connections(range.clone(), original_gates, signals)
                 .into_iter()
                 .map(|g| {
                     let idx = original_gates.iter().position(|g2| &g == g2).unwrap();
@@ -306,7 +304,7 @@ fn find_swaps<'a>(
         .iter()
         .map(|swaps| {
             swaps
-                .into_iter()
+                .iter()
                 .map(|(idx, _)| idx)
                 .tuple_combinations()
                 .collect::<Vec<(_, _)>>()
@@ -330,17 +328,16 @@ fn find_swaps<'a>(
         .iter()
         .map(|swaps| {
             swaps
-                .into_iter()
-                .filter(|((swap_from, swap_to))| {
+                .iter()
+                .filter(|(swap_from, swap_to)| {
                     swap(&mut gates, **swap_from, **swap_to);
                     let (new_result, new_total_number_of_broken_bits) =
                         run_testcases_and_count_total_number_of_wrong_bits(
                             &gates, signals, testcases,
                         );
                     swap(&mut gates, **swap_to, **swap_from);
-                    let has_improved =
-                        new_total_number_of_broken_bits < baseline_current_total_num_wrong_bits;
-                    has_improved
+
+                    new_total_number_of_broken_bits < baseline_current_total_num_wrong_bits
                 })
                 .collect_vec()
         })
@@ -407,7 +404,7 @@ fn find_swaps<'a>(
 }
 
 fn generate_random_testcases(n: u32, num_x_bits: usize) -> Vec<(String, u64, u64)> {
-    let testcases = (0..n)
+    (0..n)
         .flat_map(|_| {
             let mut x: u64 = 0;
             let mut y: u64 = 0;
@@ -419,8 +416,7 @@ fn generate_random_testcases(n: u32, num_x_bits: usize) -> Vec<(String, u64, u64
 
             vec![(format!("{x} + {y}"), x, y)]
         })
-        .collect_vec();
-    testcases
+        .collect_vec()
 }
 
 fn set_input_number(label: char, value: u64, map: &mut HashMap<&str, bool>) {
@@ -460,7 +456,7 @@ fn run_testcases_and_count_total_number_of_wrong_bits<'a>(
     assert_eq!(num_x_bits, num_y_bits);
 
     let broken = testcases
-        .into_iter()
+        .iter()
         .filter_map(|(label, x, y)| check_for_brokenness(label.to_string(), *x, *y, map, gates))
         .collect_vec();
 
@@ -521,7 +517,7 @@ fn check_for_brokenness<'a>(
     }
 
     let z_decimal_expected = x + y;
-    let final_signals = evaluate_dag(&map, &gates);
+    let final_signals = evaluate_dag(map, gates);
 
     let (z_binary_actual, z_decimal_actual) =
         read_binary_number_from_register_starting_with_char("z", &final_signals);
@@ -550,8 +546,8 @@ fn check_for_brokenness<'a>(
 }
 
 fn swap(gates: &mut Vec<Gate>, idx_1: usize, idx_2: usize) {
-    let tmp_1 = gates[idx_1].out.clone();
-    let tmp_2 = gates[idx_2].out.clone();
+    let tmp_1 = gates[idx_1].out;
+    let tmp_2 = gates[idx_2].out;
     if let Some(gate_1) = gates.get_mut(idx_1) {
         gate_1.out = tmp_2;
     }
@@ -565,7 +561,7 @@ fn render_graph(gates: &[Gate], current_map: &HashMap<&str, bool>) {
         .iter()
         .map(|gate| {
             (
-                gate.out.clone(),
+                gate.out,
                 format!(
                     "{}\n{}",
                     gate.out,
@@ -629,7 +625,7 @@ fn find_broken_ranges_in_bit_string(actual: &str, expected: &str) -> Vec<RangeIn
             (c, min..=max)
         })
         .inspect(|t| debug!("{t:?}"))
-        .filter_map(|t| (t.0 == false).then_some(t.1))
+        .filter_map(|t| (!t.0).then_some(t.1))
         .collect_vec()
 }
 
@@ -638,7 +634,7 @@ fn read_binary_number_from_register_starting_with_char(
     signals: &HashMap<&str, bool>,
 ) -> (String, u64) {
     let binary: String = signals
-        .into_iter()
+        .iter()
         .filter(|(key, _)| key.starts_with(starts_with_pattern))
         .sorted_by_key(|(key, _)| key.clone())
         .rev() // most significant bit first
@@ -738,7 +734,7 @@ fn evaluate_dag<'a>(
 ) -> HashMap<&'a str, bool> {
     let mut signals = initial_signals.clone();
 
-    let mut open_list_gates: VecDeque<Gate> = VecDeque::from_iter(gates.into_iter().cloned());
+    let mut open_list_gates: VecDeque<Gate> = VecDeque::from_iter(gates.iter().cloned());
 
     while open_list_gates.is_empty().not() {
         if let Some(pos) = open_list_gates
@@ -753,7 +749,7 @@ fn evaluate_dag<'a>(
             let in_2 = signals[signal_in_2];
 
             let out = gate.eval(in_1, in_2);
-            signals.insert(gate.out.clone(), out);
+            signals.insert(gate.out, out);
             info!(
                 "evaluated {} {} {} = {:?} ==> {} {} {} = {}",
                 signal_in_1, op, signal_in_2, gate.out, in_1, op, in_2, out
