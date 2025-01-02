@@ -658,7 +658,6 @@ impl Display for Operator {
 }
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-
 struct Gate<'a> {
     in_1: &'a str,
     in_2: &'a str,
