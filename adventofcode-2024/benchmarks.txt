@@ -95,3 +95,6 @@ day_24_bench        fastest       │ slowest       │ median        │ mean  
 ├─ part1            278.1 µs      │ 369.6 µs      │ 286.4 µs      │ 288.3 µs      │ 100     │ 100
 ╰─ part2 (lol)      37.81 s       │ 1.034 m       │ 49.94 s       │ 49.94 s       │ 2       │ 2
 ╰─ part2 fail-fast  2.82 s        │ 16.17 s       │ 9.633 s       │ 10.44 s       │ 5       │ 5
+
+day_25_bench        fastest       │ slowest       │ median        │ mean          │ samples │ iters
+╰─ part1            276.9 µs      │ 465.9 µs      │ 296.6 µs      │ 310.6 µs      │ 100     │ 100
