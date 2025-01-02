@@ -347,6 +347,18 @@ tnw OR pbm -> gnj
         // currently the result is wrong, but this is the expected output
         assert_eq!(actual_computer.z, 2024);
 
+        let expected_z = actual_computer.x + actual_computer.y;
+        let diff_bits = (actual_computer.z ^ expected_z);
+        let num_diff_bits = diff_bits.count_ones();
+        assert_eq!(num_diff_bits, 6);
+        println!("  actual_z: {:b}", actual_computer.z);
+        println!("expected_z: {:b}", expected_z);
+        println!(" diff_bits: {:b}", diff_bits);
+
+        //  actual_z: 11111101000
+        //expected_z:      101100
+        // diff_bits: 11111000100
+
         actual_computer.reset();
 
         assert_eq!(actual_computer.x, 0);
