@@ -18,7 +18,11 @@ use std::ops::{BitAnd, BitOr, BitXor, Not, RangeInclusive};
 use tracing::{debug, info};
 
 pub fn process(input: &str) -> miette::Result<String> {
-    let (_, mut aoc_computer) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
+    let (_, original_aoc_computer) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
+
+    let mut aoc_computer = original_aoc_computer.clone();
+    let x = original_aoc_computer.x;
+    let y = original_aoc_computer.y;
 
     aoc_computer.run_computer();
     let broken_bits = find_broken_output_bits(&mut aoc_computer);
@@ -29,9 +33,69 @@ pub fn process(input: &str) -> miette::Result<String> {
         broken_bits
     );
 
-    aoc_computer.determine_intersecting_gates_for_broken_bits(broken_bits);
+    let swap_candidates_per_bit: Vec<(usize, HashSet<IndexedGate>)> =
+        aoc_computer.determine_intersecting_gates_for_broken_bits(broken_bits);
+    dbg!(&swap_candidates_per_bit);
+
+    let random_testcases = generate_random_testcases(100, aoc_computer.num_z_bits - 1);
+    let real_testcase = vec![(format!("{} + {} = {}", x, y, x + y), x, y)];
+    let all_testcases = random_testcases
+        .into_iter()
+        .chain(real_testcase.into_iter())
+        .collect_vec();
+
+    let reduced_swap_groups =
+        narrow_down_swap_groups(&mut aoc_computer, swap_candidates_per_bit, &all_testcases);
 
     Ok(aoc_computer.z.to_string())
+}
+
+fn narrow_down_swap_groups(
+    aoc_computer: &mut AocComputer,
+    swap_candidates_per_bit: Vec<(usize, HashSet<IndexedGate>)>,
+    testcases: &[(String, u64, u64)],
+) {
+    // find the swaps per group, that improve from the baseline
+    let baseline_broken_bits = run_testcases_and_count_broken_bits(aoc_computer, &testcases);
+    dbg!(baseline_broken_bits);
+}
+
+fn generate_random_testcases(n: usize, num_x_bits: usize) -> Vec<(String, u64, u64)> {
+    (0..n)
+        .flat_map(|_| {
+            let mut x: u64 = 0;
+            let mut y: u64 = 0;
+
+            (0..num_x_bits).for_each(|_| {
+                x = (x << 1) + rand::rng().random_range(0..=1);
+                y = (y << 1) + rand::rng().random_range(0..=1);
+            });
+
+            vec![(format!("{x} + {y}"), x, y)]
+        })
+        .collect_vec()
+}
+
+fn run_testcases_and_count_broken_bits(
+    aoc_computer: &mut AocComputer,
+    testcases: &[(String, u64, u64)],
+) -> u32 {
+    testcases
+        .into_iter()
+        .map(|(label, test_x, test_y)| {
+            let expected_z = test_x + test_y;
+            aoc_computer.reset();
+            aoc_computer.x = *test_x;
+            aoc_computer.y = *test_y;
+            aoc_computer.run_computer();
+            let actual_z = aoc_computer.z;
+
+            let diff = actual_z ^ expected_z;
+            let num_broken = diff.count_ones();
+            debug!("Testcase {label}: Num broken: {num_broken}");
+            num_broken
+        })
+        .sum()
 }
 
 fn find_broken_output_bits(aoc_computer: &mut AocComputer) -> Vec<usize> {
@@ -54,6 +118,7 @@ fn find_broken_output_bits(aoc_computer: &mut AocComputer) -> Vec<usize> {
     broken_bits
 }
 
+#[derive(Clone)]
 struct AocComputer {
     gates: Vec<Gate>,
     initial_signals: HashMap<String, bool>,
