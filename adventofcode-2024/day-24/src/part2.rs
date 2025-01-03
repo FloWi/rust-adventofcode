@@ -58,26 +58,38 @@ fn narrow_down_swap_groups(
 ) {
     // find the swaps per group, that improve from the baseline
     let baseline_broken_bits = run_testcases_and_count_broken_bits(aoc_computer, &testcases);
-    let swap_groups_with_index_positions: Vec<(usize, Vec<(IndexedGate, usize)>)> =
-        swap_candidates_per_bit
+    let swap_groups_with_index_positions: Vec<(usize, Vec<usize>)> = swap_candidates_per_bit
+        .iter()
+        .map(|(bit_idx, indexed_gates)| {
+            let gates_with_indexes: Vec<usize> = indexed_gates
+                .iter()
+                .map(|ig| {
+                    aoc_computer
+                        .indexed_gates
+                        .iter()
+                        .position(|curr| curr == ig)
+                        .unwrap()
+                })
+                .collect_vec();
+            (*bit_idx, gates_with_indexes)
+        })
+        .collect_vec();
+
+    for (bit_idx, indexes_of_swap_candidates) in swap_groups_with_index_positions {
+        println!("Checking swaps for bit #{bit_idx}");
+        indexes_of_swap_candidates
             .iter()
-            .map(|(bit_idx, indexed_gates)| {
-                let gates_with_indexes: Vec<(IndexedGate, usize)> = indexed_gates
-                    .iter()
-                    .map(|ig| {
-                        (
-                            ig.clone(),
-                            aoc_computer
-                                .indexed_gates
-                                .iter()
-                                .position(|curr| curr == ig)
-                                .unwrap(),
-                        )
-                    })
-                    .collect_vec();
-                (*bit_idx, gates_with_indexes)
+            .tuple_combinations()
+            .for_each(|(from, to)| {
+                println!("Checking swap {from}-{to} for bit #{bit_idx}");
+                aoc_computer.swap_gate_outputs(*from, *to);
+                let num_broken = run_testcases_and_count_broken_bits(aoc_computer, &testcases);
+                if num_broken < baseline_broken_bits {
+                    println!("Found improvement by swapping gates at indices {from} and {to}");
+                }
+                aoc_computer.swap_gate_outputs(*from, *to);
             })
-            .collect_vec();
+    }
 
     dbg!(baseline_broken_bits);
 }
@@ -109,6 +121,7 @@ fn run_testcases_and_count_broken_bits(
             aoc_computer.reset();
             aoc_computer.x = *test_x;
             aoc_computer.y = *test_y;
+            println!("Running computer with x={} and y={}", test_x, test_y);
             aoc_computer.run_computer();
             let actual_z = aoc_computer.z;
 
