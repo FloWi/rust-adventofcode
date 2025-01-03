@@ -58,6 +58,27 @@ fn narrow_down_swap_groups(
 ) {
     // find the swaps per group, that improve from the baseline
     let baseline_broken_bits = run_testcases_and_count_broken_bits(aoc_computer, &testcases);
+    let swap_groups_with_index_positions: Vec<(usize, Vec<(IndexedGate, usize)>)> =
+        swap_candidates_per_bit
+            .iter()
+            .map(|(bit_idx, indexed_gates)| {
+                let gates_with_indexes: Vec<(IndexedGate, usize)> = indexed_gates
+                    .iter()
+                    .map(|ig| {
+                        (
+                            ig.clone(),
+                            aoc_computer
+                                .indexed_gates
+                                .iter()
+                                .position(|curr| curr == ig)
+                                .unwrap(),
+                        )
+                    })
+                    .collect_vec();
+                (*bit_idx, gates_with_indexes)
+            })
+            .collect_vec();
+
     dbg!(baseline_broken_bits);
 }
 
@@ -134,6 +155,26 @@ struct AocComputer {
 }
 
 impl AocComputer {
+    fn swap_gate_outputs(&mut self, index_gate_pos_1: usize, index_gate_pos_2: usize) {
+        // claude came up with this.
+        // Unfortunately acquiring two mutable instances at the same time doesn't work
+        // get_many_mut exists, but is an unstable feature, so I stick with index arithmetics. YOLO
+
+        let (min_idx, max_idx) = if index_gate_pos_1 < index_gate_pos_2 {
+            (index_gate_pos_1, index_gate_pos_2)
+        } else {
+            (index_gate_pos_2, index_gate_pos_1)
+        };
+
+        // Split the slice at the smaller index
+        let (left, right) = self.indexed_gates.split_at_mut(min_idx + 1);
+        // Now we can safely get mutable references to both elements
+        let first = &mut left[min_idx];
+        let second = &mut right[max_idx - (min_idx + 1)];
+
+        std::mem::swap(&mut first.out, &mut second.out);
+    }
+
     fn debug_print(&self, expected_z: Option<u64>) {
         let num_z_bits = self.num_z_bits;
         let x = self.x;
@@ -550,7 +591,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_process_small_example() -> miette::Result<()> {
+    fn test_swapping() -> miette::Result<()> {
         let input = r#"
 x00: 1
 x01: 1
@@ -562,17 +603,73 @@ y02: 0
 x00 AND y00 -> z00
 x01 XOR y01 -> z01
 x02 OR y02 -> z02
- "#
+"#
         .trim();
-        let (_, computer) = parse(input).unwrap();
+        let (_, mut computer) = parse(input).unwrap();
 
         let gates: HashSet<Gate> = computer
             .create_gates_from_indexed_gates()
             .into_iter()
             .collect();
 
-        let original_gates: HashSet<Gate> = computer.gates.into_iter().collect();
+        let original_gates: HashSet<Gate> = computer.gates.iter().cloned().collect();
+        assert_eq!(gates, original_gates);
 
+        // Find positions and store just the output values we need
+        let (and_gate_pos, and_gate_out) = computer
+            .indexed_gates
+            .iter()
+            .enumerate()
+            .find(|(_, ig)| ig.op == Operator::AND)
+            .map(|(idx, ig)| (idx, ig.out.clone()))
+            .unwrap();
+
+        let (or_gate_pos, or_gate_out) = computer
+            .indexed_gates
+            .iter()
+            .enumerate()
+            .find(|(_, ig)| ig.op == Operator::OR)
+            .map(|(idx, ig)| (idx, ig.out.clone()))
+            .unwrap();
+
+        // Swap
+        computer.swap_gate_outputs(and_gate_pos, or_gate_pos);
+
+        let gates: HashSet<Gate> = computer
+            .create_gates_from_indexed_gates()
+            .into_iter()
+            .collect();
+
+        let original_gates: HashSet<Gate> = computer.gates.iter().cloned().collect();
+        assert_ne!(gates, original_gates);
+
+        // Check outputs are swapped
+        let new_and_gate_out = computer
+            .indexed_gates
+            .iter()
+            .find(|ig| ig.op == Operator::AND)
+            .map(|ig| &ig.out)
+            .unwrap();
+
+        let new_or_gate_out = computer
+            .indexed_gates
+            .iter()
+            .find(|ig| ig.op == Operator::OR)
+            .map(|ig| &ig.out)
+            .unwrap();
+
+        assert_eq!(new_and_gate_out, &or_gate_out);
+        assert_eq!(new_or_gate_out, &and_gate_out);
+
+        //Swap back
+        computer.swap_gate_outputs(and_gate_pos, or_gate_pos);
+
+        let gates: HashSet<Gate> = computer
+            .create_gates_from_indexed_gates()
+            .into_iter()
+            .collect();
+
+        let original_gates: HashSet<Gate> = computer.gates.iter().cloned().collect();
         assert_eq!(gates, original_gates);
 
         Ok(())
