@@ -29,6 +29,8 @@ pub fn process(input: &str) -> miette::Result<String> {
         broken_bits
     );
 
+    aoc_computer.determine_intersecting_gates_for_broken_bits(broken_bits);
+
     Ok(aoc_computer.z.to_string())
 }
 
@@ -85,6 +87,107 @@ impl AocComputer {
         if let Some(expected_z) = expected_z {
             debug!("expected_z: {:0>width$b}", expected_z, width = num_z_bits);
         }
+    }
+
+    /// Checks the connections between x_n, z_n and z_n+1
+    /// x_n INTERSECT (z_n UNION z_n+1)
+    /// should be 6 gates for every bit
+    fn determine_intersecting_gates_for_broken_bits(
+        &mut self,
+        broken_z_bits: Vec<usize>,
+    ) -> Vec<(usize, HashSet<IndexedGate>)> {
+        broken_z_bits
+            .into_iter()
+            .map(|idx| {
+                let x_mem_location = MemoryLocation::X(idx);
+                let z_lo_mem_location = MemoryLocation::Z(idx);
+                let z_hi_mem_location = MemoryLocation::Z(idx + 1);
+
+                // all gates that are connected to x
+                let gates_connected_from_x =
+                    self.find_gates_connected_down_from_signal(&x_mem_location);
+
+                // all gates that are connected to z_lo and z_hi
+                let gates_propagating_to_lo_output =
+                    self.find_gates_connected_up_from_output(&z_lo_mem_location);
+                let gates_propagating_to_hi_output =
+                    self.find_gates_connected_up_from_output(&z_hi_mem_location);
+
+                let gates_connected_to_both_z = gates_propagating_to_lo_output
+                    .union(&gates_propagating_to_hi_output)
+                    .cloned()
+                    .collect::<HashSet<_>>();
+
+                let relevant_gates = [
+                    gates_connected_from_x.clone(),
+                    gates_connected_to_both_z.clone(),
+                ]
+                .iter()
+                .cloned()
+                .reduce(|a, b| a.intersection(&b).cloned().collect())
+                .unwrap_or_default();
+
+                info!(
+                    "{x_mem_location:?} propagates to {} gates",
+                    gates_connected_from_x.len()
+                );
+                info!(
+                    "{z_lo_mem_location:?} {z_hi_mem_location:?} propagate from {} gates",
+                    gates_connected_to_both_z.len()
+                );
+                info!("Overlap: {} gates", &relevant_gates.len());
+
+                assert_eq!(relevant_gates.len(), 6);
+                (idx, relevant_gates)
+            })
+            .collect_vec()
+    }
+
+    fn find_gates_connected_down_from_signal(
+        &self,
+        memory_location: &MemoryLocation,
+    ) -> HashSet<IndexedGate> {
+        let mut open_list = VecDeque::from([memory_location.clone()]);
+        let mut affected_gates: HashSet<IndexedGate> = HashSet::new();
+
+        while let Some(current) = open_list.pop_front() {
+            let relevant_gates: HashSet<IndexedGate> = self
+                .indexed_gates
+                .iter()
+                .filter(|g| g.in_1 == current || g.in_2 == current)
+                .cloned()
+                .collect();
+            for g in relevant_gates.iter() {
+                affected_gates.insert(g.clone());
+                open_list.push_back(g.out.clone())
+            }
+        }
+
+        affected_gates
+    }
+
+    fn find_gates_connected_up_from_output(
+        &self,
+        memory_location: &MemoryLocation,
+    ) -> HashSet<IndexedGate> {
+        let mut open_list = VecDeque::from([memory_location.clone()]);
+        let mut affected_gates: HashSet<IndexedGate> = HashSet::new();
+
+        while let Some(current) = open_list.pop_front() {
+            let relevant_gates: HashSet<IndexedGate> = self
+                .indexed_gates
+                .iter()
+                .filter(|g| g.out == current)
+                .cloned()
+                .collect();
+            for g in relevant_gates.iter() {
+                affected_gates.insert(g.clone());
+                open_list.push_back(g.in_1.clone());
+                open_list.push_back(g.in_2.clone());
+            }
+        }
+
+        affected_gates
     }
 
     fn new(gates: Vec<Gate>, input_signals: HashMap<String, bool>) -> Self {
