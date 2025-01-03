@@ -21,8 +21,35 @@ pub fn process(input: &str) -> miette::Result<String> {
     let (_, mut aoc_computer) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
 
     aoc_computer.run_computer();
+    let broken_bits = find_broken_output_bits(&mut aoc_computer);
+    assert_eq!(broken_bits.len(), 4);
+    info!(
+        "Found {} broken bits at indices {:?}",
+        broken_bits.len(),
+        broken_bits
+    );
 
     Ok(aoc_computer.z.to_string())
+}
+
+fn find_broken_output_bits(aoc_computer: &mut AocComputer) -> Vec<usize> {
+    let broken_bits = (0..(aoc_computer.num_z_bits - 1))
+        .filter(|idx| {
+            let test_x = 0;
+            let test_y = 1 << idx;
+            let expected_z = test_x + test_y;
+            aoc_computer.reset();
+            aoc_computer.x = test_x;
+            aoc_computer.y = test_y;
+            aoc_computer.run_computer();
+            let actual_z = aoc_computer.z;
+
+            aoc_computer.debug_print(Some(expected_z));
+
+            actual_z != expected_z
+        })
+        .collect_vec();
+    broken_bits
 }
 
 struct AocComputer {
@@ -35,9 +62,31 @@ struct AocComputer {
     intermediate_signal_names: Vec<String>,
     intermediate_mapping: HashMap<String, usize>,
     indexed_gates: Vec<IndexedGate>,
+    num_z_bits: usize,
 }
 
 impl AocComputer {
+    fn debug_print(&self, expected_z: Option<u64>) {
+        let num_z_bits = self.num_z_bits;
+        let x = self.x;
+        let y = self.y;
+
+        let actual_z = self.z;
+        debug!("         x: {x}");
+        debug!("         y: {y}");
+        debug!("  actual_z: {actual_z}");
+        if let Some(expected_z) = expected_z {
+            debug!("expected_z: {expected_z}");
+        }
+
+        debug!("         x: {:0>width$b}", x, width = num_z_bits);
+        debug!("         y: {:0>width$b}", y, width = num_z_bits);
+        debug!("  actual_z: {:0>width$b}", actual_z, width = num_z_bits);
+        if let Some(expected_z) = expected_z {
+            debug!("expected_z: {:0>width$b}", expected_z, width = num_z_bits);
+        }
+    }
+
     fn new(gates: Vec<Gate>, input_signals: HashMap<String, bool>) -> Self {
         let intermediate_signal_names = gates
             .iter()
@@ -76,6 +125,13 @@ impl AocComputer {
             })
             .collect_vec();
 
+        let num_z_bits = gates
+            .iter()
+            .flat_map(|g| [g.in_1.clone(), g.in_2.clone(), g.out.clone()])
+            .filter(|signal_name| signal_name.starts_with('z'))
+            .unique()
+            .count();
+
         let mut computer = Self {
             gates,
             initial_signals: input_signals.clone(),
@@ -86,6 +142,7 @@ impl AocComputer {
             intermediate_signal_names,
             intermediate_mapping: intermediate_index_mapping.clone(),
             indexed_gates,
+            num_z_bits,
         };
 
         //initialize x and y using the mechanics we already have in place
@@ -246,7 +303,7 @@ fn parse(input: &str) -> IResult<&str, AocComputer> {
     )(input)?;
 
     //now proceeding with shadowed input (rest)
-    info!("rest: \n{input}");
+    //info!("rest: \n{input}");
 
     let (input, gates) = preceded(
         multispace1,
