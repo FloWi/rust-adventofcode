@@ -16,6 +16,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Display, Formatter};
 use std::ops::{BitAnd, BitOr, BitXor, Not, RangeInclusive};
 use tracing::{debug, info};
+use tracing_subscriber::fmt::format;
 
 pub fn process(input: &str) -> miette::Result<String> {
     let (_, original_aoc_computer) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
@@ -360,6 +361,37 @@ impl AocComputer {
             },
         }
     }
+
+    fn create_gates_from_indexed_gates(&self) -> Vec<Gate> {
+        self.indexed_gates
+            .iter()
+            .map(|ig| {
+                let in_1 = self.get_name_name_from_memory_location(&ig.in_1);
+                let in_2 = self.get_name_name_from_memory_location(&ig.in_2);
+                let out = self.get_name_name_from_memory_location(&ig.out);
+
+                Gate {
+                    in_1,
+                    in_2,
+                    op: ig.op,
+                    out,
+                }
+            })
+            .collect_vec()
+    }
+
+    fn get_name_name_from_memory_location(&self, memory_location: &MemoryLocation) -> String {
+        match memory_location {
+            // {:0>width$b}
+            MemoryLocation::X(idx) => format!("x{idx:02}"),
+            MemoryLocation::Y(idx) => format!("y{idx:02}"),
+            MemoryLocation::Z(idx) => format!("z{idx:02}"),
+            MemoryLocation::Intermediate(idx) => {
+                self.intermediate_signal_names.get(*idx).unwrap().clone()
+            }
+        }
+    }
+
     fn set(&mut self, memory_location: &MemoryLocation, value: u8) {
         match memory_location {
             MemoryLocation::X(idx) => {
@@ -511,4 +543,38 @@ fn parse(input: &str) -> IResult<&str, AocComputer> {
                 .collect(),
         ),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_process_small_example() -> miette::Result<()> {
+        let input = r#"
+x00: 1
+x01: 1
+x02: 1
+y00: 0
+y01: 1
+y02: 0
+
+x00 AND y00 -> z00
+x01 XOR y01 -> z01
+x02 OR y02 -> z02
+ "#
+        .trim();
+        let (_, computer) = parse(input).unwrap();
+
+        let gates: HashSet<Gate> = computer
+            .create_gates_from_indexed_gates()
+            .into_iter()
+            .collect();
+
+        let original_gates: HashSet<Gate> = computer.gates.into_iter().collect();
+
+        assert_eq!(gates, original_gates);
+
+        Ok(())
+    }
 }
