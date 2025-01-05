@@ -23,3 +23,8 @@ test-log.workspace = true
 name = "day-24-bench"
 path = "benches/benchmarks.rs"
 harness = false
+
+[[bench]]
+name = "day-24-alloc"
+path = "benches/alloc.rs"
+harness = false
