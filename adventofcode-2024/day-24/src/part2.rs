@@ -9,16 +9,10 @@ use nom::combinator::value;
 use nom::multi::separated_list1;
 use nom::sequence::{preceded, separated_pair, tuple};
 use nom::{IResult, Parser};
-use petgraph::dot::Dot;
-use petgraph::prelude::DiGraphMap;
 use rand::Rng;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::fmt::{Display, Formatter};
-use std::iter::Map;
-use std::ops::{BitAnd, BitOr, BitXor, Not, RangeInclusive};
-use std::vec::IntoIter;
+use std::ops::{BitAnd, BitOr, BitXor};
 use tracing::{debug, info};
-use tracing_subscriber::fmt::format;
 
 pub fn process(input: &str) -> miette::Result<String> {
     let (_, original_aoc_computer) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
@@ -44,7 +38,7 @@ pub fn process(input: &str) -> miette::Result<String> {
     let one_bit_testcases = generate_one_bit_testcases(&mut aoc_computer);
     let all_testcases = random_testcases
         .into_iter()
-        .chain(real_testcase.into_iter())
+        .chain(real_testcase)
         .collect_vec();
 
     let reduced_swap_groups = narrow_down_swap_groups(
@@ -114,7 +108,7 @@ fn narrow_down_swap_groups(
         &original_swap_candidates_per_bit
     );
     // find the swaps per group, that improve from the baseline
-    let baseline_broken_bits = run_testcases_and_count_broken_bits(aoc_computer, &testcases);
+    let baseline_broken_bits = run_testcases_and_count_broken_bits(aoc_computer, testcases);
     let swap_groups_with_index_positions: Vec<(usize, Vec<usize>)> =
         original_swap_candidates_per_bit
             .iter()
@@ -162,7 +156,7 @@ fn narrow_down_swap_groups(
                     // aoc_computer.create_gates_from_indexed_gates().iter().for_each(|g| debug!("{} {:?} {} -> {}", g.in_1, g.op, g.in_2, g.out) );
 
                     aoc_computer.swap_gate_outputs(from, to);
-                    let num_broken = run_testcases_and_count_broken_bits(aoc_computer, &testcases);
+                    let num_broken = run_testcases_and_count_broken_bits(aoc_computer, testcases);
                     aoc_computer.swap_gate_outputs(from, to);
                     let has_improved = num_broken < baseline_broken_bits;
                     if has_improved {
@@ -218,7 +212,7 @@ fn run_testcases_and_count_broken_bits(
     testcases: &[(String, u64, u64)],
 ) -> u32 {
     testcases
-        .into_iter()
+        .iter()
         .map(|(label, test_x, test_y)| {
             let expected_z = test_x + test_y;
             aoc_computer.reset();
@@ -256,7 +250,7 @@ fn generate_one_bit_testcases(aoc_computer: &mut AocComputer) -> Vec<(String, u6
 }
 
 fn find_broken_output_bits(aoc_computer: &mut AocComputer) -> Vec<usize> {
-    let broken_bits = (0..(aoc_computer.num_z_bits - 1))
+    (0..(aoc_computer.num_z_bits - 1))
         .filter(|idx| {
             let test_x = 0;
             let test_y = 1 << idx;
@@ -271,8 +265,7 @@ fn find_broken_output_bits(aoc_computer: &mut AocComputer) -> Vec<usize> {
 
             actual_z != expected_z
         })
-        .collect_vec();
-    broken_bits
+        .collect_vec()
 }
 
 #[derive(Clone)]

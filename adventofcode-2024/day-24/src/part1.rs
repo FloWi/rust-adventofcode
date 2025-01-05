@@ -9,13 +9,9 @@ use nom::combinator::value;
 use nom::multi::separated_list1;
 use nom::sequence::{preceded, separated_pair, tuple};
 use nom::{IResult, Parser};
-use petgraph::dot::Dot;
-use petgraph::prelude::DiGraphMap;
-use rand::Rng;
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::fmt::{Display, Formatter};
-use std::ops::{BitAnd, BitOr, BitXor, Not, RangeInclusive};
-use tracing::{debug, info};
+use std::collections::{HashMap, VecDeque};
+use std::ops::{BitAnd, BitOr, BitXor};
+use tracing::info;
 
 pub fn process(input: &str) -> miette::Result<String> {
     let (_, mut aoc_computer) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
@@ -356,7 +352,7 @@ tnw OR pbm -> gnj
         assert_eq!(actual_computer.z, 2024);
 
         let expected_z = actual_computer.x + actual_computer.y;
-        let diff_bits = (actual_computer.z ^ expected_z);
+        let diff_bits = actual_computer.z ^ expected_z;
         let num_diff_bits = diff_bits.count_ones();
         assert_eq!(num_diff_bits, 6);
         println!("  actual_z: {:b}", actual_computer.z);
