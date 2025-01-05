@@ -14,7 +14,9 @@ use petgraph::prelude::DiGraphMap;
 use rand::Rng;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Display, Formatter};
+use std::iter::Map;
 use std::ops::{BitAnd, BitOr, BitXor, Not, RangeInclusive};
+use std::vec::IntoIter;
 use tracing::{debug, info};
 use tracing_subscriber::fmt::format;
 
@@ -36,62 +38,163 @@ pub fn process(input: &str) -> miette::Result<String> {
 
     let swap_candidates_per_bit: Vec<(usize, HashSet<IndexedGate>)> =
         aoc_computer.determine_intersecting_gates_for_broken_bits(broken_bits);
-    dbg!(&swap_candidates_per_bit);
 
     let random_testcases = generate_random_testcases(100, aoc_computer.num_z_bits - 1);
     let real_testcase = vec![(format!("{} + {} = {}", x, y, x + y), x, y)];
+    let one_bit_testcases = generate_one_bit_testcases(&mut aoc_computer);
     let all_testcases = random_testcases
         .into_iter()
         .chain(real_testcase.into_iter())
         .collect_vec();
 
-    let reduced_swap_groups =
-        narrow_down_swap_groups(&mut aoc_computer, swap_candidates_per_bit, &all_testcases);
+    let reduced_swap_groups = narrow_down_swap_groups(
+        &mut aoc_computer,
+        swap_candidates_per_bit,
+        &one_bit_testcases,
+    );
 
-    Ok(aoc_computer.z.to_string())
+    let final_candidates = reduced_swap_groups
+        .iter()
+        .map(|(_bit, swap_groups)| swap_groups)
+        .multi_cartesian_product()
+        .collect_vec();
+
+    info!(
+        "Performing final check on {} candidates",
+        final_candidates.len()
+    );
+
+    let result = final_candidates
+        .iter()
+        .enumerate()
+        .find_map(|(idx, group)| {
+            // swap
+            for (from, to) in group {
+                aoc_computer.swap_gate_outputs(*from, *to);
+            }
+            let num_broken = run_testcases_and_count_broken_bits(&mut aoc_computer, &all_testcases);
+
+            //swap back
+            for (from, to) in group {
+                aoc_computer.swap_gate_outputs(*from, *to);
+            }
+            if num_broken == 0 {
+                info!(
+                    "FOUND solution after {} of {} checks",
+                    idx + 1,
+                    final_candidates.len()
+                );
+            };
+            (num_broken == 0).then(|| {
+                group
+                    .iter()
+                    .flat_map(|(idx_1, idx_2)| {
+                        let gate_1 = aoc_computer.indexed_gates.get(*idx_1).unwrap();
+                        let gate_2 = aoc_computer.indexed_gates.get(*idx_2).unwrap();
+                        let label_1 = aoc_computer.get_name_name_from_memory_location(&gate_1.out);
+                        let label_2 = aoc_computer.get_name_name_from_memory_location(&gate_2.out);
+                        vec![label_1, label_2]
+                    })
+                    .sorted()
+                    .join(",")
+            })
+        })
+        .expect("There should be a solution");
+
+    Ok(result)
 }
 
 fn narrow_down_swap_groups(
     aoc_computer: &mut AocComputer,
-    swap_candidates_per_bit: Vec<(usize, HashSet<IndexedGate>)>,
+    original_swap_candidates_per_bit: Vec<(usize, HashSet<IndexedGate>)>,
     testcases: &[(String, u64, u64)],
-) {
+) -> Vec<(usize, Vec<(usize, usize)>)> {
+    debug!(
+        "original_swap_candidates_per_bit: {:?}",
+        &original_swap_candidates_per_bit
+    );
     // find the swaps per group, that improve from the baseline
     let baseline_broken_bits = run_testcases_and_count_broken_bits(aoc_computer, &testcases);
-    let swap_groups_with_index_positions: Vec<(usize, Vec<usize>)> = swap_candidates_per_bit
+    let swap_groups_with_index_positions: Vec<(usize, Vec<usize>)> =
+        original_swap_candidates_per_bit
+            .iter()
+            .map(|(bit_idx, indexed_gates)| {
+                let gates_with_indexes: Vec<usize> = indexed_gates
+                    .iter()
+                    .map(|ig| {
+                        aoc_computer
+                            .indexed_gates
+                            .iter()
+                            .position(|curr| curr == ig)
+                            .unwrap()
+                    })
+                    .collect_vec();
+                (*bit_idx, gates_with_indexes)
+            })
+            .collect_vec();
+
+    debug!(
+        "swap_groups_with_index_positions: {:?}",
+        &swap_groups_with_index_positions
+    );
+    let initial_swap_index_candidates = swap_groups_with_index_positions
         .iter()
-        .map(|(bit_idx, indexed_gates)| {
-            let gates_with_indexes: Vec<usize> = indexed_gates
-                .iter()
-                .map(|ig| {
-                    aoc_computer
-                        .indexed_gates
-                        .iter()
-                        .position(|curr| curr == ig)
-                        .unwrap()
+        .flat_map(|(_, indices)| indices)
+        .unique()
+        .sorted()
+        .collect_vec();
+    debug!(
+        "{} initial_swap_index_candidates: {:?}",
+        &initial_swap_index_candidates.len(),
+        &initial_swap_index_candidates
+    );
+
+    let relevant_swap_groups_with_index_positions = swap_groups_with_index_positions
+        .into_iter()
+        .map(|(bit_idx, indexes_of_swap_candidates)| {
+            debug!("Checking swaps for bit #{bit_idx}");
+            let relevant_swap_candidates = indexes_of_swap_candidates
+                .into_iter()
+                .tuple_combinations()
+                .filter_map(|(from, to)| {
+                    debug!("Checking swap {from}-{to} for bit #{bit_idx}");
+                    // debug!("Gates after swap: \n===========================================================================================================");
+                    // aoc_computer.create_gates_from_indexed_gates().iter().for_each(|g| debug!("{} {:?} {} -> {}", g.in_1, g.op, g.in_2, g.out) );
+
+                    aoc_computer.swap_gate_outputs(from, to);
+                    let num_broken = run_testcases_and_count_broken_bits(aoc_computer, &testcases);
+                    aoc_computer.swap_gate_outputs(from, to);
+                    let has_improved = num_broken < baseline_broken_bits;
+                    if has_improved {
+                        debug!("Found improvement by swapping gates at indices {from} and {to}. Broken: {num_broken} vs. baseline {baseline_broken_bits}");
+                    } else {
+                        debug!("No improvement by swapping gates at indices {from} and {to}. Broken: {num_broken} vs. baseline {baseline_broken_bits}");
+                    }
+                    has_improved.then_some((from, to))
                 })
                 .collect_vec();
-            (*bit_idx, gates_with_indexes)
+            (bit_idx, relevant_swap_candidates)
         })
         .collect_vec();
 
-    for (bit_idx, indexes_of_swap_candidates) in swap_groups_with_index_positions {
-        println!("Checking swaps for bit #{bit_idx}");
-        indexes_of_swap_candidates
-            .iter()
-            .tuple_combinations()
-            .for_each(|(from, to)| {
-                println!("Checking swap {from}-{to} for bit #{bit_idx}");
-                aoc_computer.swap_gate_outputs(*from, *to);
-                let num_broken = run_testcases_and_count_broken_bits(aoc_computer, &testcases);
-                if num_broken < baseline_broken_bits {
-                    println!("Found improvement by swapping gates at indices {from} and {to}");
-                }
-                aoc_computer.swap_gate_outputs(*from, *to);
-            })
-    }
+    debug!(
+        "relevant_swap_groups_with_index_positions: {:?}",
+        &relevant_swap_groups_with_index_positions
+    );
 
-    dbg!(baseline_broken_bits);
+    let relevant_swap_index_candidates = relevant_swap_groups_with_index_positions
+        .iter()
+        .flat_map(|(_, swap_pairs)| swap_pairs.iter().flat_map(|(from, to)| vec![from, to]))
+        .unique()
+        .sorted()
+        .collect_vec();
+    debug!(
+        "{} relevant_swap_index_candidates: {:?}",
+        relevant_swap_index_candidates.len(),
+        &relevant_swap_index_candidates
+    );
+
+    relevant_swap_groups_with_index_positions
 }
 
 fn generate_random_testcases(n: usize, num_x_bits: usize) -> Vec<(String, u64, u64)> {
@@ -121,8 +224,12 @@ fn run_testcases_and_count_broken_bits(
             aoc_computer.reset();
             aoc_computer.x = *test_x;
             aoc_computer.y = *test_y;
-            println!("Running computer with x={} and y={}", test_x, test_y);
+            debug!("Running computer with x={} and y={}", test_x, test_y);
             aoc_computer.run_computer();
+            debug!(
+                "Done running computer with x={} and y={}. Result z={}",
+                test_x, test_y, aoc_computer.z
+            );
             let actual_z = aoc_computer.z;
 
             let diff = actual_z ^ expected_z;
@@ -131,6 +238,21 @@ fn run_testcases_and_count_broken_bits(
             num_broken
         })
         .sum()
+}
+
+fn generate_one_bit_testcases(aoc_computer: &mut AocComputer) -> Vec<(String, u64, u64)> {
+    (0..(aoc_computer.num_z_bits - 1))
+        .map(|idx| {
+            let test_x = 0;
+            let test_y = 1 << idx;
+
+            (
+                format!("0 + 2^({}) --> 0 + {test_y}", idx + 1),
+                test_x,
+                test_y,
+            )
+        })
+        .collect_vec()
 }
 
 fn find_broken_output_bits(aoc_computer: &mut AocComputer) -> Vec<usize> {
@@ -485,12 +607,29 @@ impl AocComputer {
         // alternative if cloning is too slow
         // putting all the indices of the indexed_gates into the queue and accessing them like this
         // let foo = &self.indexed_gates[0];
+        let mut try_counter = 0;
         while let Some(indexed_gate) = operations.pop_front() {
+            // debug!("Try #{try_counter} of {}", operations.len());
+            if try_counter > operations.len() {
+                // debug!(
+                //     "No progress for any gate after {try_counter} of {}",
+                //     operations.len()
+                // );
+                return;
+            }
             match self.execute(&indexed_gate) {
                 ExecutionResult::NotAllInputsAvailable => {
+                    // debug!(
+                    //     "Try #{try_counter} of {} not successful - putting gate to the back of the queue", operations.len()
+                    // );
+                    try_counter += 1;
                     operations.push_back(indexed_gate);
                 }
-                ExecutionResult::Ok => {}
+                ExecutionResult::Ok => {
+                    // debug!("Try #{try_counter} successful - resetting try_counter");
+
+                    try_counter = 0;
+                }
             }
         }
     }
@@ -686,5 +825,23 @@ x02 OR y02 -> z02
         assert_eq!(gates, original_gates);
 
         Ok(())
+    }
+
+    // broken scenario
+    // Checking swap 142-196 for bit #14
+    // Running computer with x=22398072246731 and y=759209994931
+    // doesn't terminate
+    #[test]
+    fn debug_swap_endless_compute() {
+        let input = include_str!("../input2.txt");
+
+        let (_, mut computer) = parse(input).unwrap();
+        computer.swap_gate_outputs(142, 196);
+        computer.x = 22398072246731;
+        computer.y = 759209994931;
+
+        println!("Running computer");
+        computer.run_computer();
+        println!("Done running computer");
     }
 }
