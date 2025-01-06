@@ -1,9 +1,18 @@
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone)]
+#[wasm_bindgen]
 pub struct Solution {
     result: String,
+}
+
+#[wasm_bindgen]
+impl Solution {
+    #[wasm_bindgen(getter)]
+    pub fn result(&self) -> String {
+        self.result.clone()
+    }
 }
 
 #[wasm_bindgen]
@@ -19,20 +28,13 @@ pub enum Part {
 }
 
 #[wasm_bindgen]
-pub fn solve_day(day: u8, part: u8, input: &str) -> Result<JsValue, JsValue> {
-    let part = match part {
-        1 => Part::Part1,
-        2 => Part::Part2,
-        _ => return Err(JsValue::from_str("Part must be 1 or 2")),
-    };
-
+pub fn solve_day(day: u8, part: Part, input: &str) -> Solution {
     solve_day_internal(day, part, input)
         .map(|result| {
             let solution = Solution { result };
-            serde_wasm_bindgen::to_value(&solution)
-                .unwrap_or_else(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+            solution
         })
-        .map_err(|e| JsValue::from_str(&format!("Error: {}", e)))
+        .unwrap()
 }
 
 fn solve_day_internal(day: u8, part: Part, input: &str) -> miette::Result<String> {
