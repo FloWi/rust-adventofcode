@@ -198,8 +198,8 @@ fn generate_random_testcases(n: usize, num_x_bits: usize) -> Vec<(String, u64, u
             let mut y: u64 = 0;
 
             (0..num_x_bits).for_each(|_| {
-                x = (x << 1) + rand::rng().random_range(0..=1);
-                y = (y << 1) + rand::rng().random_range(0..=1);
+                x = (x << 1) + rand::thread_rng().gen_range(0..=1);
+                y = (y << 1) + rand::thread_rng().gen_range(0..=1);
             });
 
             vec![(format!("{x} + {y}"), x, y)]
@@ -826,7 +826,7 @@ x02 OR y02 -> z02
     // doesn't terminate
     #[test]
     fn debug_swap_endless_compute() {
-        let input = include_str!("../input2.txt");
+        let input = include_str!("../input.txt");
 
         let (_, mut computer) = parse(input).unwrap();
         computer.swap_gate_outputs(142, 196);

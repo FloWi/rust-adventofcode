@@ -2,8 +2,15 @@ use glam::IVec2;
 use miette::miette;
 use std::ops::RangeInclusive;
 
+pub fn process(input: &str) -> miette::Result<String> {
+    process_parameterized(input, &(0..=70))
+}
+
 #[tracing::instrument]
-pub fn process(input: &str, grid_limit: &RangeInclusive<i32>) -> miette::Result<String> {
+pub fn process_parameterized(
+    input: &str,
+    grid_limit: &RangeInclusive<i32>,
+) -> miette::Result<String> {
     let (_, byte_locations): (&str, Vec<IVec2>) =
         crate::parse(input).map_err(|e| miette!("parse failed {}", e))?;
 

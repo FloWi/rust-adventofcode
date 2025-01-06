@@ -8,7 +8,7 @@ fn main() {
 #[divan::bench]
 fn part1() {
     part1::process(
-        divan::black_box(include_str!("../input1.txt",)),
+        divan::black_box(include_str!("../input.txt",)),
         &(0..=70),
         1024,
     )
@@ -17,5 +17,5 @@ fn part1() {
 
 #[divan::bench]
 fn part2() {
-    part2::process(divan::black_box(include_str!("../input2.txt",)), &(0..=70)).unwrap();
+    part2::process(divan::black_box(include_str!("../input.txt",)), &(0..=70)).unwrap();
 }

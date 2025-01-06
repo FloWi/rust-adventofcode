@@ -4,7 +4,14 @@ use itertools::Itertools;
 use std::collections::HashMap;
 
 #[tracing::instrument]
-pub fn process(input: &str, min_savings_limit: Option<u32>) -> miette::Result<String> {
+pub fn process(input: &str) -> miette::Result<String> {
+    process_parameterized(input, Some(100))
+}
+#[tracing::instrument]
+pub fn process_parameterized(
+    input: &str,
+    min_savings_limit: Option<u32>,
+) -> miette::Result<String> {
     let racetrack = parse(input);
 
     let (path, cost) =
@@ -104,7 +111,10 @@ mod tests {
         // There is one cheat that saves 64 picoseconds.
 
         let expected_number_of_cheats: i32 = [14, 14, 2, 4, 2, 3, 1, 1, 1, 1, 1].iter().sum();
-        assert_eq!(expected_number_of_cheats.to_string(), process(input, None)?);
+        assert_eq!(
+            expected_number_of_cheats.to_string(),
+            process_parameterized(input, None)?
+        );
         Ok(())
     }
 

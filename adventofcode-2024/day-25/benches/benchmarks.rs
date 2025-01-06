@@ -7,5 +7,5 @@ fn main() {
 
 #[divan::bench]
 fn part1() {
-    part1::process(divan::black_box(include_str!("../input1.txt",))).unwrap();
+    part1::process(divan::black_box(include_str!("../input.txt",))).unwrap();
 }

@@ -3,7 +3,12 @@ use glam::IVec2;
 use itertools::Itertools;
 
 #[tracing::instrument]
-pub fn process(input: &str, min_savings_limit: u32) -> miette::Result<String> {
+pub fn process(input: &str) -> miette::Result<String> {
+    process_parameterized(input, 100)
+}
+
+#[tracing::instrument]
+pub fn process_parameterized(input: &str, min_savings_limit: u32) -> miette::Result<String> {
     let racetrack = parse(input);
 
     let (path, cost) =
@@ -94,7 +99,10 @@ mod tests {
             .sum();
 
         // I thought this was a valid testcase. My solution created the correct answer for part 2 but not for this testcase.
-        assert_eq!(expected_number_of_cheats.to_string(), process(input, 50)?);
+        assert_eq!(
+            expected_number_of_cheats.to_string(),
+            process_parameterized(input, 50)?
+        );
         Ok(())
     }
 

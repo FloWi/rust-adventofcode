@@ -11,8 +11,10 @@ nom.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 miette.workspace = true
+wasm-bindgen.workspace = true
 petgraph.workspace = true
-rand = "0.9.0-beta.1"
+rand.workspace = true
+getrandom.workspace = true
 
 [dev-dependencies]
 divan.workspace = true

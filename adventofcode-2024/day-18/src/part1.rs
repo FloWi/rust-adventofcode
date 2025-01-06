@@ -10,8 +10,12 @@ use nom::sequence::separated_pair;
 use nom::IResult;
 use std::ops::RangeInclusive;
 
+pub fn process(input: &str) -> miette::Result<String> {
+    process_parameterized(input, &(0..=70), 1024)
+}
+
 #[tracing::instrument]
-pub fn process(
+pub fn process_parameterized(
     input: &str,
     grid_limit: &RangeInclusive<i32>,
     num_bytes: usize,
