@@ -77,7 +77,7 @@ mod tests {
 2,0
         "#
         .trim();
-        assert_eq!("22", process(input, &(0..=6), 12)?);
+        assert_eq!("22", process_parameterized(input, &(0..=6), 12)?);
         Ok(())
     }
 }

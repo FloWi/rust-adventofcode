@@ -38,7 +38,7 @@ Button B: X+27, Y+71
 Prize: X=18641, Y=10279
         "#
         .trim();
-        assert_eq!("480", process(input)?);
+        assert_eq!("875318608908", process(input)?);
         Ok(())
     }
 }

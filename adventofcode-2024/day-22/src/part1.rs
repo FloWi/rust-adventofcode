@@ -28,7 +28,6 @@ fn generate_secrets(initial: u64) -> impl Iterator<Item = u64> {
         let next_value_3 = mix_and_prune(next_value_2, next_value_2 * 2048);
         Some(next_value_3)
     })
-    .skip(1)
 }
 
 fn mix_and_prune(secret: u64, num: u64) -> u64 {
@@ -61,7 +60,7 @@ mod tests {
             5908254,
         ];
 
-        let actual = generate_secrets(123).take(10).collect_vec();
+        let actual = generate_secrets(123).skip(1).take(10).collect_vec();
 
         assert_eq!(actual, expected_next_10_secrets);
 

@@ -1,4 +1,4 @@
-use day_20::part2::process_parameterized;
+use day_20::part2::process;
 use miette::Context;
 
 #[tracing::instrument]

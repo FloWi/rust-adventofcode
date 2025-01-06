@@ -30,7 +30,7 @@ mod tests {
 379A
         "#
         .trim();
-        assert_eq!("126384", process(input)?);
+        assert_eq!("154115708116294", process(input)?);
         Ok(())
     }
 }
