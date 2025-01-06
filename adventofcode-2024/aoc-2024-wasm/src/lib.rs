@@ -36,6 +36,8 @@ pub fn solve_day(day: u8, part: u8, input: &str) -> Result<JsValue, JsValue> {
 }
 
 fn solve_day_internal(day: u8, part: Part, input: &str) -> miette::Result<String> {
+    let input = input.trim();
+
     match (day, part) {
         (01, Part::Part1) => day_01::part1::process(input),
         (01, Part::Part2) => day_01::part2::process(input),
