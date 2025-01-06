@@ -30,12 +30,16 @@ class AocUI {
 
       this.solutionDiv.style.display = 'block';
 
+
       // Handle Part 1
       const part1 = results.find(r => r.part === 1);
+      console.log(part1);
+
       this.part1Pre.textContent = part1?.error || part1?.result || 'Not computed';
 
       // Handle Part 2
       const part2 = results.find(r => r.part === 2);
+      console.log(part2);
       this.part2Pre.textContent = part2?.error || part2?.result || 'Not computed';
 
     } catch (e) {

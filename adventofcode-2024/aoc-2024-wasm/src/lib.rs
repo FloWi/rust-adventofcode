@@ -5,6 +5,7 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 pub struct Solution {
     result: String,
+    error: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -12,6 +13,11 @@ impl Solution {
     #[wasm_bindgen(getter)]
     pub fn result(&self) -> String {
         self.result.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn error(&self) -> Option<String> {
+        self.error.clone()
     }
 }
 
@@ -29,12 +35,16 @@ pub enum Part {
 
 #[wasm_bindgen]
 pub fn solve_day(day: u8, part: Part, input: &str) -> Solution {
-    solve_day_internal(day, part, input)
-        .map(|result| {
-            let solution = Solution { result };
-            solution
-        })
-        .unwrap()
+    match solve_day_internal(day, part, input) {
+        Ok(result) => Solution {
+            result,
+            error: None,
+        },
+        Err(err) => Solution {
+            result: String::new(),
+            error: Some(err.to_string()),
+        },
+    }
 }
 
 fn solve_day_internal(day: u8, part: Part, input: &str) -> miette::Result<String> {

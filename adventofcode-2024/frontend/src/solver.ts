@@ -24,12 +24,9 @@ export class AocSolver {
 
     const parts = day === 25 ? [Part.Part1] : [Part.Part1, Part.Part2];
     return parts.map(part => {
-      try {
-        const response = solve_day(day, part, input);
-        return {part, result: response.result};
-      } catch (error: any) {
-        return {part, error: error.toString()};
-      }
+
+      const response = solve_day(day, part, input);
+      return response.error ? {part, error: response.error.toString()} : {part, result: response.result};
     });
   }
 }
