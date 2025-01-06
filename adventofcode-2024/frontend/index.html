@@ -81,59 +81,9 @@
   </div>
 </div>
 
-<script type="module">
-  import init, {solve_day, init_panic_hook} from './pkg/aoc_2024_wasm.js';
+<!-- Replace the existing script tag with: -->
+<script type="module" src="./dist/main.js"></script>
 
-  window.solve = async function () {
-    try {
-      const day = parseInt(document.getElementById('day').value);
-      const input = document.getElementById('input').value;
-      const parts = day === 25 ? [1] : [1, 2];
-
-      // Since solve_day is synchronous, we can just map over the parts directly
-      const results = parts.map(part => {
-        try {
-          const response = solve_day(day, part, input);
-          return {
-            part,
-            result: response.result  // directly access the result property
-          };
-        } catch (error) {
-          return {
-            part,
-            error: error.toString()
-          };
-        }
-      });
-
-      const solution = document.getElementById('solution');
-      solution.style.display = 'block';
-
-      // Handle Part 1
-      const part1 = results.find(r => r.part === 1);
-      document.getElementById('part1').textContent = part1?.error || part1?.result || 'Not computed';
-
-      // Handle Part 2
-      const part2 = results.find(r => r.part === 2);
-      document.getElementById('part2').textContent = part2?.error || part2?.result || 'Not computed';
-
-
-    } catch (e) {
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'error';
-      errorDiv.textContent = e.toString();
-      document.getElementById('solution').insertAdjacentElement('beforebegin', errorDiv);
-    }
-  }
-
-  // Initialize the WASM module
-  async function init_wasm() {
-    await init();
-    init_panic_hook();
-  }
-
-  init_wasm();
-</script>
 </body>
 </html>
 
