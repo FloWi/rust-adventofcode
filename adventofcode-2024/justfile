@@ -33,3 +33,30 @@ create day:
 # get the input for a day's puzzle
 get-input day:
     ./scripts/get-aoc-input.rs --day {{day}} --current-working-directory {{justfile_directory()}}
+
+# Variables
+hugo_static := env_var('HOME') + "/programming/content-flowi.github.io/static/adventofcode-2024"
+frontend_dir := "./frontend"
+
+# Build and publish the frontend to Hugo static directory
+publish-hugo: build copy-to-hugo
+
+# Build the frontend
+build:
+    cd {{frontend_dir}} && yarn build
+
+# Copy the built artifacts to Hugo static directory
+copy-to-hugo:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Ensure the destination directory exists
+    mkdir -p {{hugo_static}}
+
+    # Clean the existing content
+    rm -rf {{hugo_static}}/*
+
+    # Copy the new content
+    cp -r {{frontend_dir}}/dist/* {{hugo_static}}/
+
+    echo "✓ Published to Hugo static directory at {{hugo_static}}"
