@@ -12,13 +12,25 @@ use nom::Parser;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
-    process_with_game_field_dimensions(input, IVec2::new(101, 103))
+    process_parameterized(input, IVec2::new(101, 103))
 }
+
+fn parse_args(args: &str) -> IResult<&str, IVec2> {
+    let (remaining, (x, y)): (&str, (i32, i32)) =
+        separated_pair(complete::i32, tag(","), complete::i32)(args)?;
+
+    Ok((remaining, IVec2::new(x, y)))
+}
+
+pub fn process_with_args(input: &str, args: &str) -> miette::Result<String> {
+    let (_, game_field_dimensions) =
+        parse_args(args).map_err(|e| miette!("arg-parse failed {}", e))?;
+
+    Ok(process_parameterized(input, game_field_dimensions)?)
+}
+
 #[tracing::instrument]
-pub fn process_with_game_field_dimensions(
-    input: &str,
-    game_field_dimensions: IVec2,
-) -> miette::Result<String> {
+pub fn process_parameterized(input: &str, game_field_dimensions: IVec2) -> miette::Result<String> {
     let width = game_field_dimensions.x;
     let height = game_field_dimensions.y;
 
@@ -128,7 +140,7 @@ p=9,5 v=-3,-3
         .trim();
         assert_eq!(
             "12",
-            process_with_game_field_dimensions(input, TEST_GAME_FIELD_DIMENSIONS)?
+            process_parameterized(input, TEST_GAME_FIELD_DIMENSIONS)?
         );
         Ok(())
     }

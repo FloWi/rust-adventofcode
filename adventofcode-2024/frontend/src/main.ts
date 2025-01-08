@@ -52,6 +52,7 @@ class AocUI {
 
   async initialize(): Promise<void> {
     await this.solver.initialize();
+    await this.solver.printTestcases();
   }
 }
 

@@ -13,6 +13,7 @@ use nom::Parser;
 pub fn process(input: &str) -> miette::Result<String> {
     process_with_game_field_dimensions(input, IVec2::new(101, 103))
 }
+
 #[tracing::instrument]
 pub fn process_with_game_field_dimensions(
     input: &str,

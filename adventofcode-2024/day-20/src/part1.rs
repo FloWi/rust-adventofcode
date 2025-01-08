@@ -1,12 +1,39 @@
 use crate::{find_path, parse, Racetrack, NEIGHBORS};
 use glam::IVec2;
 use itertools::Itertools;
+use miette::miette;
+use nom::branch::alt;
+use nom::bytes::complete::tag;
+use nom::character::complete;
+use nom::combinator::{map, value};
+use nom::sequence::{delimited, separated_pair};
+use nom::IResult;
 use std::collections::HashMap;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
     process_parameterized(input, Some(100))
 }
+
+fn parse_args(args: &str) -> IResult<&str, Option<u32>> {
+    let (remaining, maybe_value) = alt((
+        value(None, tag("None")),
+        map(
+            delimited(tag("Some("), complete::u32, tag(")")),
+            |some_value: u32| Some(some_value),
+        ),
+    ))(args)?;
+
+    Ok((remaining, maybe_value))
+}
+
+pub fn process_with_args(input: &str, args: &str) -> miette::Result<String> {
+    let (_, maybe_min_savings_limit) =
+        parse_args(args).map_err(|e| miette!("arg-parse failed {}", e))?;
+
+    Ok(process_parameterized(input, maybe_min_savings_limit)?)
+}
+
 #[tracing::instrument]
 pub fn process_parameterized(
     input: &str,
@@ -112,8 +139,8 @@ mod tests {
 
         let expected_number_of_cheats: i32 = [14, 14, 2, 4, 2, 3, 1, 1, 1, 1, 1].iter().sum();
         assert_eq!(
-            expected_number_of_cheats.to_string(),
-            process_parameterized(input, None)?
+            process_parameterized(input, None)?,
+            expected_number_of_cheats.to_string()
         );
         Ok(())
     }

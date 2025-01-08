@@ -1,10 +1,25 @@
 use crate::{find_path, parse};
 use glam::IVec2;
 use itertools::Itertools;
+use miette::miette;
+use nom::character::complete;
+use nom::IResult;
 
 #[tracing::instrument]
 pub fn process(input: &str) -> miette::Result<String> {
     process_parameterized(input, 100)
+}
+
+fn parse_args(args: &str) -> IResult<&str, u32> {
+    let (remaining, value) = complete::u32(args)?;
+
+    Ok((remaining, value))
+}
+
+pub fn process_with_args(input: &str, args: &str) -> miette::Result<String> {
+    let (_, min_savings_limit) = parse_args(args).map_err(|e| miette!("arg-parse failed {}", e))?;
+
+    Ok(process_parameterized(input, min_savings_limit)?)
 }
 
 #[tracing::instrument]

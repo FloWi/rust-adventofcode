@@ -1,6 +1,6 @@
 // solver.ts
 // Your imports should now look like this
-import init, {solve_day, init_panic_hook, Part} from '../wasm/aoc_2024_wasm';
+import init, {get_testcases, init_panic_hook, Part, solve_day} from '../wasm/aoc_2024_wasm';
 
 interface PuzzleResult {
   part: number;
@@ -17,6 +17,16 @@ export class AocSolver {
       init_panic_hook();
       this.initialized = true;
     }
+  }
+
+  async printTestcases() {
+    await this.initialize();
+    get_testcases().forEach((tc) => {
+      console.log(JSON.stringify(tc));
+
+    })
+
+
   }
 
   async solvePuzzle(day: number, input: string): Promise<PuzzleResult[]> {
