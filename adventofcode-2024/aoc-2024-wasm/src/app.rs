@@ -67,16 +67,22 @@ fn AocDay() -> impl IntoView {
     let testcases_by_day = use_context::<ReadSignal<Vec<(u32, Vec<Testcase>)>>>().expect("to have found the testcases");
 
     let params = use_params_map();
-    let day = move || params.read().get("day").unwrap_or_default();
+    let maybe_day = move || params.read().get("day");
 
-    let maybe_testcases_for_day = testcases_by_day.read().iter().cloned().find(|(d, _)| d.to_string() == day());
+    move || {
+        maybe_day().map(|day| {
+            let maybe_testcases_for_day = testcases_by_day.read().iter().cloned().find(|(d, _)| d.to_string() == day);
 
-    let json_str = match maybe_testcases_for_day {
-        None => "".to_string(),
-        Some((_, testcases)) => serde_json::to_string_pretty(&testcases).unwrap_or("".to_string()),
-    };
+            //FIXME: this doesn't refresh when I navigate around by clicking links
+            // reloading the page with the route '/days/:day' _does_ work
+            let json_str = match maybe_testcases_for_day {
+                None => "".to_string(),
+                Some((_, testcases)) => serde_json::to_string_pretty(&testcases).unwrap_or("".to_string()),
+            };
 
-    div().child(move || format!("AocDay - Day {:02}", day().as_str())).child(pre().child(json_str))
+            div().child(format!("AocDay - Day {:02}", day)).child(pre().child(json_str))
+        })
+    }
 }
 
 #[component]
@@ -109,7 +115,7 @@ fn AocDays() -> impl IntoView {
 
     // thanks to https://tailwindcomponents.com/component/blue-buttons-example for the showcase layout
     // can't put Title and main into an array or vec, because this break the type-checker - a tuple works fine.
-    let nav_bar = div().class("flex flex-col flex-wrap").child(days_html);
+    let nav_bar = div().class("flex flex-col min-w-fit").child(days_html);
 
     div().class("bg-gradient-to-tl from-blue-800 to-blue-500 text-white font-mono flex flex-col min-h-screen").child((
         title().child("Leptos + Tailwindcss"),
