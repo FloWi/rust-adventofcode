@@ -2,3 +2,4 @@ day-*/input*.txt
 .hide
 flamegraph.svg
 aoc-2024-wasm/pkg/*
+aoc-2024-wasm/dist/*

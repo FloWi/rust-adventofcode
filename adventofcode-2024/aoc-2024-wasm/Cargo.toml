@@ -3,17 +3,17 @@ name = "aoc-2024-wasm"
 version = "0.1.0"
 edition = "2021"
 
-[lib]
-crate-type = ["cdylib"]
-
 [dependencies]
-wasm-bindgen = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 toml = { workspace = true }
-serde-wasm-bindgen = { workspace = true }
 console_error_panic_hook = { workspace = true }
-web-sys = { workspace = true }
+itertools = { workspace = true }
 miette = { workspace = true }
+leptos = { version = "0.7.3", features = ["csr"] }
+leptos_meta = "0.7.3"
+leptos_router = "0.7.3"
+
 
 # Reference all your day crates
 day-01 = { path = "../day-01" }

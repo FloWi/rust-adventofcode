@@ -2,47 +2,36 @@ pub mod testcases;
 
 use crate::testcases::{read_all_testcases, Testcase};
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::*;
 
 #[derive(Clone)]
-#[wasm_bindgen]
 pub struct Solution {
     result: String,
     error: Option<String>,
 }
 
-#[wasm_bindgen]
 impl Solution {
-    #[wasm_bindgen(getter)]
     pub fn result(&self) -> String {
         self.result.clone()
     }
 
-    #[wasm_bindgen(getter)]
     pub fn error(&self) -> Option<String> {
         self.error.clone()
     }
 }
 
-#[wasm_bindgen]
 pub fn init_panic_hook() {
     console_error_panic_hook::set_once();
 }
 
-#[wasm_bindgen]
 #[derive(Debug)]
 pub enum Part {
     Part1 = 1,
     Part2 = 2,
 }
 
-#[wasm_bindgen]
 pub fn solve_day(day: u8, part: Part, input: &str) -> Solution {
     match solve_day_internal(day, part, input) {
-        Ok(result) => Solution {
-            result,
-            error: None,
-        },
+        Ok(result) => Solution { result, error: None },
         Err(err) => Solution {
             result: String::new(),
             error: Some(err.to_string()),
@@ -50,7 +39,6 @@ pub fn solve_day(day: u8, part: Part, input: &str) -> Solution {
     }
 }
 
-#[wasm_bindgen]
 pub fn get_testcases() -> Vec<Testcase> {
     let testcases = read_all_testcases();
     testcases
@@ -111,22 +99,4 @@ fn solve_day_internal(day: u8, part: Part, input: &str) -> miette::Result<String
         (25, Part::Part1) => day_25::part1::process(input),
         (day, part) => panic!("Day {day} Part {part:?} not included"),
     }
-}
-
-#[wasm_bindgen]
-extern "C" {
-    // Use `js_namespace` here to bind `console.log(..)` instead of just
-    // `log(..)`
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-
-    // The `console.log` is quite polymorphic, so we can bind it with multiple
-    // signatures. Note that we need to use `js_name` to ensure we always call
-    // `log` in JS.
-    #[wasm_bindgen(js_namespace = console, js_name = log)]
-    fn log_u32(a: u32);
-
-    // Multiple arguments too!
-    #[wasm_bindgen(js_namespace = console, js_name = log)]
-    fn log_many(a: &str, b: &str);
 }
