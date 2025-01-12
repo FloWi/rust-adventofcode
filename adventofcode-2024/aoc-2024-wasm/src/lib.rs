@@ -29,7 +29,7 @@ pub enum Part {
     Part2 = 2,
 }
 
-pub fn solve_day(day: u8, part: Part, input: &str) -> Solution {
+pub fn solve_day(day: u32, part: Part, input: &str) -> Solution {
     match solve_day_internal(day, part, input) {
         Ok(result) => Solution { result, error: None },
         Err(err) => Solution {
@@ -44,7 +44,7 @@ pub fn get_testcases() -> Vec<Testcase> {
     testcases
 }
 
-fn solve_day_internal(day: u8, part: Part, input: &str) -> miette::Result<String> {
+fn solve_day_internal(day: u32, part: Part, input: &str) -> miette::Result<String> {
     let input = input.trim();
 
     match (day, part) {

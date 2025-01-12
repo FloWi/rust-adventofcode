@@ -3,5 +3,5 @@
 @tailwind utilities;
 
 a[aria-current] {
-    font-weight: bold;
+    font-weight: 900;
 }

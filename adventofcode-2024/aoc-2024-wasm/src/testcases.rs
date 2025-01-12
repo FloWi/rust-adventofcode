@@ -5,7 +5,7 @@ use std::collections::HashMap;
 pub struct Testcase {
     pub day: u32,
     pub part: u32,
-    pub arg: Option<String>,
+    pub args: Option<String>,
     pub solution: String,
     pub input: String,
 }

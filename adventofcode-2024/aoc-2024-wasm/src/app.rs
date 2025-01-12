@@ -1,7 +1,12 @@
+use aoc_2024_wasm::solve_day;
 use aoc_2024_wasm::testcases::Testcase;
+use aoc_2024_wasm::Part::{Part1, Part2};
 use itertools::Itertools;
-use leptos::html::{div, main, pre, title, ul};
+use leptos::ev::click;
+use leptos::html::{button, div, h3, main, p, pre, span, title, ul, Button, HtmlElement};
+use leptos::leptos_dom::logging::console_log;
 use leptos::prelude::*;
+use leptos::tachys::html::class::Class;
 use leptos_meta::*;
 use leptos_router::components::{Outlet, ParentRoute};
 use leptos_router::hooks::use_params_map;
@@ -62,6 +67,53 @@ pub fn App() -> impl IntoView {
     }
 }
 
+fn write_to_clipboard(text: &str) {
+    let maybe_clipboard = web_sys::window().map(|w| w.navigator().clipboard());
+    match maybe_clipboard {
+        Some(cp) => {
+            cp.write_text(text); //TODO: This is fire-and-forget - figure out how to deal with Promises in rust-world
+        }
+        None => console_log("Can't write to clipboard"),
+    }
+}
+
+#[component]
+fn AocTestcase(testcase: Testcase) -> impl IntoView {
+    let part = match testcase.part {
+        1 => Ok(Part1),
+        2 => Ok(Part2),
+        _ => Err("Let's not get too ambitions - two parts are enough ;-)"),
+    };
+    let args = match testcase.args {
+        None => Ok(()),
+        Some(_) => Err("Not implemented yet"),
+    };
+
+    let result = match (part, args) {
+        (Ok(part), Ok(_)) => Ok(solve_day(testcase.day, part, &testcase.input)),
+        _ => Err("Not implemented yet"),
+    };
+
+    let result_html = match result {
+        Ok(res) => span().class("font-bold").child(res.result()),
+        Err(err) => span().class("font-bold red").child(format!("Error: {}", err)),
+    };
+
+    let testcase_input = testcase.input.clone();
+
+    div().child((
+        pre().class("w-full max-h-48 overflow-y-auto overflow-x-auto whitespace-pre").child(testcase.input),
+        styled_button().on(click, move |_| write_to_clipboard(testcase_input.as_str())).child("Copy to clipboard"),
+        testcase.args.map(|arg| p().child(span().class("font-bold").child("Custom Arg: ")).child(span().child(arg))),
+        p().child(span().class("font-bold").child("Expected Solution: ")).child(span().child(testcase.solution)),
+        p().child(span().class("font-bold").child("Actual Solution: ")).child(result_html),
+    ))
+}
+
+fn styled_button() -> HtmlElement<Button, (Class<&'static str>,), ()> {
+    button().class("inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3")
+}
+
 #[component]
 fn AocDay() -> impl IntoView {
     let testcases_by_day = use_context::<ReadSignal<Vec<(u32, Vec<Testcase>)>>>().expect("to have found the testcases");
@@ -75,12 +127,21 @@ fn AocDay() -> impl IntoView {
 
             //FIXME: this doesn't refresh when I navigate around by clicking links
             // reloading the page with the route '/days/:day' _does_ work
-            let json_str = match maybe_testcases_for_day {
-                None => "".to_string(),
-                Some((_, testcases)) => serde_json::to_string_pretty(&testcases).unwrap_or("".to_string()),
-            };
+            let part_divs = maybe_testcases_for_day.map(|(_, testcases)| {
+                testcases
+                    .iter()
+                    .into_group_map_by(|tc| tc.part)
+                    .into_iter()
+                    .sorted_by_key(|tup| tup.0)
+                    .map(|(part, testcases)| {
+                        div()
+                            .child(h3().child(format!("Part {}: {} Testcases", part, testcases.len())))
+                            .child(testcases.into_iter().map(|tc| AocTestcase(AocTestcaseProps { testcase: tc.clone() })).collect_view())
+                    })
+                    .collect_view()
+            });
 
-            div().child(format!("AocDay - Day {:02}", day)).child(pre().child(json_str))
+            div().child(format!("AocDay - Day {:02}", day)).child(div().class("flex flex-col gap-4 divide-y *:py-4 first:*:pt-0 last:*:pb-0").child(part_divs))
         })
     }
 }
@@ -124,3 +185,17 @@ fn AocDays() -> impl IntoView {
         ),
     ))
 }
+/*
+{
+    #[allow(unused_braces)] {
+        ::leptos::prelude::View::new(::leptos::tachys::html::element::button
+            ().child(#[allow(unused_braces)] {
+            "Copy to Clipboard"
+        }).class("btn btn-accent w-full"
+        ).on(::leptos::tachys::html::event::click, move |_| {
+            write_to_clipboard(testcase_input.as_str())
+        },
+        ))
+    }
+}
+ */
