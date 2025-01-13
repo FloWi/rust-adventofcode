@@ -1,6 +1,6 @@
-use aoc_2024_wasm::solve_day;
 use aoc_2024_wasm::testcases::Testcase;
 use aoc_2024_wasm::Part::{Part1, Part2};
+use aoc_2024_wasm::{solve_day, Solution};
 use itertools::Itertools;
 use leptos::ev::click;
 use leptos::html::{button, div, h3, main, p, pre, span, title, ul, Button, HtmlElement};
@@ -44,9 +44,8 @@ pub fn App() -> impl IntoView {
         <main>
           // <Routes/> both defines our routes and shows them on the page
           <Routes fallback=|| "Not found.">
-            // our root route: the contact list is always shown
             <ParentRoute
-              path=path!("days")
+              path=path!("adventofcode-2024/days")
               view=AocDays
             >
               // users like /gbj or /bob
@@ -57,7 +56,7 @@ pub fn App() -> impl IntoView {
               // a fallback if the /:id segment is missing from the URL
               <Route
                 path=path!("")
-                view=move || view! { <p class="contact">"Select a contact."</p> }
+                view=move || view! { <p class="day">"Select a day."</p> }
               />
             </ParentRoute>
           </Routes>
@@ -94,12 +93,21 @@ fn AocTestcase(testcase: Testcase) -> impl IntoView {
         _ => Err("Not implemented yet"),
     };
 
-    let result_html = match result {
-        Ok(res) => span().class("font-bold").child(res.result()),
+    let result_html = match result.clone() {
+        Ok(res) => span().class("font-bold").child(res.result),
         Err(err) => span().class("font-bold red").child(format!("Error: {}", err)),
     };
 
     let testcase_input = testcase.input.clone();
+    use humantime::format_duration;
+
+    let duration = match result {
+        Ok(res) => {
+            let std_duration = res.duration.to_std().unwrap();
+            format_duration(std_duration).to_string()
+        }
+        Err(_) => "-".to_string(),
+    };
 
     div().child((
         pre().class("w-full max-h-48 overflow-y-auto overflow-x-auto whitespace-pre").child(testcase.input),
@@ -107,6 +115,7 @@ fn AocTestcase(testcase: Testcase) -> impl IntoView {
         testcase.args.map(|arg| p().child(span().class("font-bold").child("Custom Arg: ")).child(span().child(arg))),
         p().child(span().class("font-bold").child("Expected Solution: ")).child(span().child(testcase.solution)),
         p().child(span().class("font-bold").child("Actual Solution: ")).child(result_html),
+        p().child(span().class("font-bold").child("Duration: ")).child(duration),
     ))
 }
 

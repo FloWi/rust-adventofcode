@@ -36,7 +36,7 @@ get-input day:
 
 # Variables
 hugo_static := env_var('HOME') + "/programming/content-flowi.github.io/static/adventofcode-2024"
-frontend_dir := "./frontend"
+frontend_dir := "./aoc-2024-wasm"
 
 # Build and publish the frontend to Hugo static directory
 publish-hugo: build copy-to-hugo

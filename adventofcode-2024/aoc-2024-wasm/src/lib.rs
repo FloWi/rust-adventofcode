@@ -1,22 +1,14 @@
 pub mod testcases;
 
 use crate::testcases::{read_all_testcases, Testcase};
+use chrono::{Duration, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 pub struct Solution {
-    result: String,
-    error: Option<String>,
-}
-
-impl Solution {
-    pub fn result(&self) -> String {
-        self.result.clone()
-    }
-
-    pub fn error(&self) -> Option<String> {
-        self.error.clone()
-    }
+    pub result: String,
+    pub error: Option<String>,
+    pub duration: TimeDelta,
 }
 
 pub fn init_panic_hook() {
@@ -30,11 +22,17 @@ pub enum Part {
 }
 
 pub fn solve_day(day: u32, part: Part, input: &str) -> Solution {
-    match solve_day_internal(day, part, input) {
-        Ok(result) => Solution { result, error: None },
+    use chrono;
+    let start = Utc::now();
+    let result = solve_day_internal(day, part, input);
+    let end = Utc::now();
+    let duration = end.signed_duration_since(start);
+    match result {
+        Ok(result) => Solution { result, error: None, duration },
         Err(err) => Solution {
             result: String::new(),
             error: Some(err.to_string()),
+            duration,
         },
     }
 }

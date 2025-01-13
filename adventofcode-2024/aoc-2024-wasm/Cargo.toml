@@ -43,3 +43,5 @@ day-22 = { path = "../day-22" }
 day-23 = { path = "../day-23" }
 day-24 = { path = "../day-24" }
 day-25 = { path = "../day-25" }
+chrono = "0.4.39"
+humantime = "2.1.0"
