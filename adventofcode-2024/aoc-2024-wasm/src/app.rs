@@ -45,7 +45,7 @@ pub fn App() -> impl IntoView {
           // <Routes/> both defines our routes and shows them on the page
           <Routes fallback=|| "Not found.">
             <ParentRoute
-              path=path!("adventofcode-2024/days")
+              path=path!("adventofcode-2024/")
               view=AocDays
             >
               // users like /gbj or /bob
