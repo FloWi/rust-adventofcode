@@ -35,7 +35,6 @@ pub fn App() -> impl IntoView {
     provide_context(testcases_by_day);
 
     view! {
-        <Stylesheet id="leptos" href="/style/output.css"/>
         <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico"/>
        <div id="root">
       // we wrap the whole app in a <Router/> to allow client-side navigation
