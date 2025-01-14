@@ -40,7 +40,7 @@ const DIRECTION_KEY_MAP: [(IVec2, char); 5] = [
     (IVec2::new(2, 1), '>'),
 ];
 
-fn compute_complexity(input_code: &str, level: u32) -> usize {
+fn compute_complexity(input_code: &str, level: u32) -> u64 {
     let numeric_key_map = KeyMap::new(&NUMERIC_KEY_MAP);
     let directional_key_map = KeyMap::new(&DIRECTION_KEY_MAP);
 
@@ -56,7 +56,7 @@ fn compute_complexity(input_code: &str, level: u32) -> usize {
     let numeric_part_of_code = input_code
         .strip_suffix("A")
         .unwrap()
-        .parse::<usize>()
+        .parse::<u64>()
         .unwrap();
 
     shortest_length * numeric_part_of_code
@@ -108,7 +108,7 @@ fn compute_optimal_moves_for_robot(
     to: char,
     key_map: &KeyMap,
     level: u32,
-    call_map: &mut HashMap<(char, char, u32), usize>,
+    call_map: &mut HashMap<(char, char, u32), u64>,
 ) -> Vec<String> {
     let start: IVec2 = key_map.char_to_loc[&from];
     let destination: IVec2 = key_map.char_to_loc[&to];
@@ -165,8 +165,8 @@ fn compute_number_of_sequences_str(
     max_level: u32,
     numeric_keypad: &KeyMap,
     directional_keypad: &KeyMap,
-    cache: &mut HashMap<(char, char, u32), usize>,
-) -> usize {
+    cache: &mut HashMap<(char, char, u32), u64>,
+) -> u64 {
     format!("A{input}")
         .chars()
         .tuple_windows()
@@ -191,8 +191,8 @@ fn compute_shortest_sequence_length_level_0(
     max_level: u32,
     numeric_keypad: &KeyMap,
     directional_keypad: &KeyMap,
-    cache: &mut HashMap<(char, char, u32), usize>,
-) -> usize {
+    cache: &mut HashMap<(char, char, u32), u64>,
+) -> u64 {
     let keypad = match level {
         l if l == max_level => numeric_keypad,
         _ => directional_keypad,
@@ -210,7 +210,7 @@ fn compute_shortest_sequence_length_level_0(
                 compute_optimal_moves_for_robot(from, to, keypad, level, &mut HashMap::new());
 
             let result = if level == 0 {
-                moves[0].len()
+                moves[0].len() as u64
             } else {
                 let next_level = level - 1;
                 debug!(

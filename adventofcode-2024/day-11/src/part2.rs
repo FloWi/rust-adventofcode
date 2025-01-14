@@ -5,14 +5,18 @@ use nom::character::complete::space1;
 use nom::multi::separated_list1;
 use nom::IResult;
 use std::collections::HashMap;
-use std::time::Instant;
 use tracing::debug;
 
 #[tracing::instrument(skip(input))]
 pub fn process(input: &str) -> miette::Result<String> {
     let (_, stones) = parse(input).map_err(|e| miette!("parse failed {}", e))?;
 
-    let stones_map: HashMap<u64, usize> = stones.into_iter().counts();
+    let stones_map: HashMap<u64, u64> = stones
+        .into_iter()
+        .counts()
+        .iter()
+        .map(|(k, v)| (*k, *v as u64))
+        .collect();
 
     let stones_collection = (0..75)
         .scan(stones_map, |stones_map, idx| {
@@ -26,7 +30,7 @@ pub fn process(input: &str) -> miette::Result<String> {
         "found {} different stones in final step",
         final_stones.len()
     );
-    let result = final_stones.values().sum::<usize>();
+    let result = final_stones.values().sum::<u64>();
 
     Ok(result.to_string())
 }
@@ -36,9 +40,8 @@ fn parse(input: &str) -> IResult<&str, Vec<u64>> {
 }
 
 #[tracing::instrument(skip(stones), fields(idx = idx))]
-fn apply_rules(stones: &HashMap<u64, usize>, idx: i32) -> HashMap<u64, usize> {
-    let start = Instant::now();
-    let num_initial_stones: usize = stones.values().sum();
+fn apply_rules(stones: &HashMap<u64, u64>, idx: i32) -> HashMap<u64, u64> {
+    let num_initial_stones: u64 = stones.values().sum();
 
     let mut new_stones = stones.clone();
 
@@ -82,8 +85,7 @@ fn apply_rules(stones: &HashMap<u64, usize>, idx: i32) -> HashMap<u64, usize> {
     debug!(
         target: "applying rules",
         initial_stones = num_initial_stones,
-        new_stones = new_stones.values().sum::<usize>(),
-        duration_ms = start.elapsed().as_millis()
+        new_stones = new_stones.values().sum::<u64>(),
     );
     new_stones
 }
@@ -104,7 +106,7 @@ mod tests {
         Ok(())
     }
 
-    fn sorted_occurrences_string(occurrences: HashMap<u64, usize>) -> String {
+    fn sorted_occurrences_string(occurrences: HashMap<u64, u64>) -> String {
         occurrences
             .iter()
             .filter(|(_, &v)| v > 0)
@@ -115,12 +117,21 @@ mod tests {
 
     #[test]
     fn test_one_blink() -> miette::Result<()> {
-        let stones: HashMap<u64, usize> = [0, 1, 10, 99, 999].iter().map(|i| *i as u64).counts();
+        let stones: HashMap<u64, u64> = [0, 1, 10, 99, 999]
+            .iter()
+            .map(|i| *i as u64)
+            .counts()
+            .iter()
+            .map(|(k, v)| (*k, *v as u64))
+            .collect();
         let actual = apply_rules(&stones, 0);
         let expected = [1, 2024, 1, 0, 9, 9, 2021976]
             .iter()
             .map(|i| *i as u64)
-            .counts();
+            .counts()
+            .iter()
+            .map(|(k, v)| (*k, *v as u64))
+            .collect();
         assert_eq!(
             sorted_occurrences_string(actual),
             sorted_occurrences_string(expected)

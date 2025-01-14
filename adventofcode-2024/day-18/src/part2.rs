@@ -1,9 +1,26 @@
 use glam::IVec2;
 use miette::miette;
+use nom::bytes::complete::tag;
+use nom::character::complete;
+use nom::sequence::separated_pair;
+use nom::IResult;
 use std::ops::RangeInclusive;
 
 pub fn process(input: &str) -> miette::Result<String> {
     process_parameterized(input, &(0..=70))
+}
+
+fn parse_args(args: &str) -> IResult<&str, RangeInclusive<i32>> {
+    let (remaining, (range_from, range_to)) =
+        separated_pair(complete::i32, tag("..="), complete::i32)(args)?;
+
+    Ok((remaining, range_from..=range_to))
+}
+
+pub fn process_with_args(input: &str, args: &str) -> miette::Result<String> {
+    let (_, min_savings_limit) = parse_args(args).map_err(|e| miette!("arg-parse failed {}", e))?;
+
+    Ok(process_parameterized(input, &min_savings_limit)?)
 }
 
 #[tracing::instrument]

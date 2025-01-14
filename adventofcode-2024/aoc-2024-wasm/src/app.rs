@@ -3,7 +3,7 @@ use aoc_2024_wasm::Part::{Part1, Part2};
 use aoc_2024_wasm::{solve_day, Solution};
 use itertools::Itertools;
 use leptos::ev::click;
-use leptos::html::{button, div, h3, main, p, pre, span, title, ul, Button, HtmlElement};
+use leptos::html::{button, div, h3, main, p, pre, span, textarea, title, ul, Button, HtmlElement};
 use leptos::leptos_dom::logging::console_log;
 use leptos::prelude::*;
 use leptos::tachys::html::class::Class;
@@ -45,10 +45,9 @@ pub fn App() -> impl IntoView {
           // <Routes/> both defines our routes and shows them on the page
           <Routes fallback=|| "Not found.">
             <ParentRoute
-              path=path!("adventofcode-2024/")
-              view=AocDays
+              path=path!("adventofcode-2024")
+              view=AocDays // this component has an <Outlet/> for rendering the inner <AocDay> component
             >
-              // users like /gbj or /bob
               <Route
                 path=path!(":day")
                 view=AocDay
@@ -83,14 +82,10 @@ fn AocTestcase(testcase: Testcase) -> impl IntoView {
         2 => Ok(Part2),
         _ => Err("Let's not get too ambitions - two parts are enough ;-)"),
     };
-    let args = match testcase.args {
-        None => Ok(()),
-        Some(_) => Err("Not implemented yet"),
-    };
 
-    let result = match (part, args) {
-        (Ok(part), Ok(_)) => Ok(solve_day(testcase.day, part, &testcase.input)),
-        _ => Err("Not implemented yet"),
+    let result = match part {
+        Ok(part) => Ok(solve_day(testcase.day, part, &testcase.input, testcase.args.clone())),
+        Err(err) => Err(err),
     };
 
     let result_html = match result.clone() {
@@ -110,12 +105,20 @@ fn AocTestcase(testcase: Testcase) -> impl IntoView {
     };
 
     div().child((
-        pre().class("w-full max-h-48 overflow-y-auto overflow-x-auto whitespace-pre").child(testcase.input),
-        styled_button().on(click, move |_| write_to_clipboard(testcase_input.as_str())).child("Copy to clipboard"),
-        testcase.args.map(|arg| p().child(span().class("font-bold").child("Custom Arg: ")).child(span().child(arg))),
+        //view! { <textarea readonly class="">{testcase.input}</textarea>  },
         p().child(span().class("font-bold").child("Expected Solution: ")).child(span().child(testcase.solution)),
         p().child(span().class("font-bold").child("Actual Solution: ")).child(result_html),
         p().child(span().class("font-bold").child("Duration: ")).child(duration),
+        //testcase.args.map(|args| p().child(span().class("font-bold").child("Custom Args: ")).child(args)),
+        testcase.args.map(|arg| p().child(span().class("font-bold").child("Custom Args: ")).child(span().child(arg))),
+        p().class("font-bold mt-4").child(span().child("Testdata:")),
+        styled_button().on(click, move |_| write_to_clipboard(testcase_input.as_str())).child("Copy"),
+        textarea()
+            .readonly(true)
+            .class("w-full overflow-y-auto overflow-x-auto whitespace-pre text-inherit bg-inherit")
+            .child(testcase.input)
+            .rows(20)
+            .cols(40),
     ))
 }
 
@@ -144,13 +147,14 @@ fn AocDay() -> impl IntoView {
                     .sorted_by_key(|tup| tup.0)
                     .map(|(part, testcases)| {
                         div()
+                            .class("flex flex-col gap-4 divide-y")
                             .child(h3().child(format!("Part {}: {} Testcases", part, testcases.len())))
                             .child(testcases.into_iter().map(|tc| AocTestcase(AocTestcaseProps { testcase: tc.clone() })).collect_view())
                     })
                     .collect_view()
             });
 
-            div().child(format!("AocDay - Day {:02}", day)).child(div().class("flex flex-col gap-4 divide-y *:py-4 first:*:pt-0 last:*:pb-0").child(part_divs))
+            div().child(format!("AocDay - Day {:02}", day)).child(div().class("flex flex-row gap-8 divide-x").child(part_divs))
         })
     }
 }

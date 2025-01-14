@@ -11,7 +11,7 @@ pub fn process(input: &str) -> miette::Result<String> {
         .map(|code| compute_complexity(code, 2))
         .collect_vec();
 
-    let result: usize = complexities.iter().sum();
+    let result: u64 = complexities.iter().sum();
 
     Ok(result.to_string())
 }
