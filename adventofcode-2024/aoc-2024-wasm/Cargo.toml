@@ -11,6 +11,7 @@ console_error_panic_hook = { workspace = true }
 itertools = { workspace = true }
 miette = { workspace = true }
 leptos = { version = "0.7.3", features = ["csr"] }
+leptos-use = { version = "0.15.3", features = ["use_drop_zone", "docs"] }
 leptos_meta = "0.7.3"
 leptos_router = "0.7.3"
 web-sys = { version = "0.3.76", features = ["Navigator", "Clipboard"] }

@@ -3,7 +3,7 @@ use aoc_2024_wasm::Part::{Part1, Part2};
 use aoc_2024_wasm::{solve_day, Solution};
 use itertools::Itertools;
 use leptos::ev::click;
-use leptos::html::{button, div, h3, main, p, pre, span, textarea, title, ul, Button, HtmlElement};
+use leptos::html::{button, div, h2, h3, main, p, pre, span, textarea, title, ul, Button, Div, HtmlElement};
 use leptos::leptos_dom::logging::console_log;
 use leptos::prelude::*;
 use leptos::tachys::html::class::Class;
@@ -47,6 +47,7 @@ pub fn App() -> impl IntoView {
               path=path!("adventofcode-2024")
               view=AocDays // this component has an <Outlet/> for rendering the inner <AocDay> component
             >
+              <Route path=path!("manage-inputs") view=RealInputManager />
               <Route
                 path=path!(":day")
                 view=AocDay
@@ -125,6 +126,60 @@ fn styled_button() -> HtmlElement<Button, (Class<&'static str>,), ()> {
     button().class("inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3")
 }
 
+use leptos_use::docs::{demo_or_body, BooleanDisplay};
+use leptos_use::{use_drop_zone_with_options, UseDropZoneOptions, UseDropZoneReturn};
+
+#[component]
+fn RealInputManager() -> impl IntoView {
+    let (dropped, set_dropped) = signal(false);
+
+    let drop_zone_el = NodeRef::<Div>::new();
+
+    let UseDropZoneReturn { is_over_drop_zone, files } = use_drop_zone_with_options(
+        drop_zone_el,
+        UseDropZoneOptions::default().on_drop(move |_| set_dropped.set(true)).on_enter(move |_| set_dropped.set(false)),
+    );
+
+    let file_divs = move || {
+        files
+            .get()
+            .iter()
+            .map(|file| {
+                view! {
+                    <div class="w-200px bg-black-200/10 ma-2 pa-6">
+                                                    <p>Name: {file.name()}</p>
+                                                    <p>Size: {file.size()}</p>
+                                                    <p>Type: {file.type_()}</p>
+                                                    <p>Last modified: {file.last_modified()}</p>
+                                                </div>
+                }
+            })
+            .collect_view()
+    };
+
+    view! {
+        <div class="flex">
+            <div class="w-full h-auto relative">
+                <p>Drop files into dropZone</p>
+                <div class="bg-green w-16 h16">Drop me</div>
+                <div
+                    node_ref=drop_zone_el
+                    class="flex flex-col w-full min-h-[200px] h-auto bg-gray-400/10 justify-center items-center pt-6"
+                >
+                    <div>is_over_drop_zone: <BooleanDisplay value=is_over_drop_zone/></div>
+                    <div>dropped: <BooleanDisplay value=dropped/></div>
+                    <div class="flex flex-wrap justify-center items-center">
+                        Got {move || files.get().len()} files
+                    </div>
+                    <div class="flex flex-wrap justify-center items-center">
+                      {file_divs}
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
 #[component]
 fn AocDay() -> impl IntoView {
     let testcases_by_day = use_context::<ReadSignal<Vec<(u32, Vec<Testcase>)>>>().expect("to have found the testcases");
@@ -153,7 +208,9 @@ fn AocDay() -> impl IntoView {
                     .collect_view()
             });
 
-            div().child(format!("AocDay - Day {:02}", day)).child(div().class("flex flex-row gap-8 divide-x").child(part_divs))
+            div()
+                .child(h2().class("text-xl font-bold").child(format!("AocDay - Day {:02}", day)))
+                .child(div().class("flex flex-row gap-8 divide-x").child(part_divs))
         })
     }
 }
