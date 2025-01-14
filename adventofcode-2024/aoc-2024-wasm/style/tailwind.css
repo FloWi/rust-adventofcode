@@ -3,5 +3,5 @@
 @tailwind utilities;
 
 a[aria-current] {
-    font-weight: 900;
+    @apply text-sky-800
 }
