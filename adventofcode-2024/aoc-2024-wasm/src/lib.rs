@@ -4,7 +4,7 @@ use crate::testcases::{read_all_testcases, Testcase};
 use chrono::{Duration, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Solution {
     pub result: String,
     pub error: Option<String>,
@@ -15,7 +15,7 @@ pub fn init_panic_hook() {
     console_error_panic_hook::set_once();
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Part {
     Part1 = 1,
     Part2 = 2,

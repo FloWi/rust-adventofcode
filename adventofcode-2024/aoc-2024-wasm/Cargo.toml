@@ -7,6 +7,7 @@ edition = "2021"
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
+rayon = { workspace = true }
 console_error_panic_hook = { workspace = true }
 itertools = { workspace = true }
 miette = { workspace = true }

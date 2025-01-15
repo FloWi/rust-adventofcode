@@ -131,6 +131,7 @@ dependencies = [
  "leptos_meta",
  "leptos_router",
  "miette",
+ "rayon",
  "regex",
  "send_wrapper",
  "serde",

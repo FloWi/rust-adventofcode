@@ -1,7 +1,9 @@
 use aoc_2024_wasm::solve_day;
 use aoc_2024_wasm::testcases::Testcase;
 use aoc_2024_wasm::Part::{Part1, Part2};
+use codee::string::JsonSerdeCodec;
 use futures::FutureExt;
+use humantime::format_duration;
 use itertools::Itertools;
 use leptos::html::{button, div, h2, h3, main, p, span, textarea, title, ul, Button, Div, HtmlElement};
 use leptos::leptos_dom::logging::console_log;
@@ -18,6 +20,7 @@ use leptos_router::{
 use leptos_use::docs::BooleanDisplay;
 use leptos_use::storage::use_local_storage;
 use leptos_use::{use_drop_zone_with_options, UseDropZoneOptions, UseDropZoneReturn};
+use rayon::prelude::*;
 use regex::Regex;
 use send_wrapper::SendWrapper;
 use serde::{Deserialize, Serialize};
@@ -53,7 +56,7 @@ pub fn App() -> impl IntoView {
     let (testcases_by_day, _set_testcases_by_day) = signal(testcases_by_day);
 
     provide_context(testcases_by_day);
-    let (all_real_input_files, set_all_real_input_files, _) = use_local_storage::<AocInput, codee::string::JsonSerdeCodec>("adventofcode-2024");
+    let (all_real_input_files, set_all_real_input_files, _) = use_local_storage::<AocInput, JsonSerdeCodec>("adventofcode-2024");
 
     view! {
         <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico"/>
@@ -115,7 +118,6 @@ fn AocTestcase(testcase: Testcase) -> impl IntoView {
     };
 
     let testcase_input = testcase.input.clone();
-    use humantime::format_duration;
 
     let duration = match result {
         Ok(res) => {
@@ -217,7 +219,7 @@ async fn store_files_in_localstorage(files: Vec<SendWrapper<File>>, set_all_real
         .iter()
         .cloned()
         .map(|(name, content)| {
-            let day: u32 = parse_day_from_file(&name).unwrap();
+            let day: u32 = parse_day_from_str(&name).unwrap();
             AocDayInput { day, input: content }
         })
         .collect_vec();
@@ -229,7 +231,7 @@ async fn store_files_in_localstorage(files: Vec<SendWrapper<File>>, set_all_real
     set_all_real_input_files.set(AocInput { days: content });
 }
 
-fn parse_day_from_file(filename: &str) -> Option<u32> {
+fn parse_day_from_str(filename: &str) -> Option<u32> {
     let re = Regex::new(r"\d+").unwrap();
     re.find(filename)?.as_str().parse().ok()
 }
@@ -256,6 +258,7 @@ fn AocDay(read: Signal<AocInput>) -> impl IntoView {
     move || {
         maybe_day_and_inputs().map(|(day_str, maybe_real_input)| {
             let maybe_testcases_for_day = testcases_by_day.read().iter().cloned().find(|(d, _)| d.to_string() == day_str);
+            let day = parse_day_from_str(&day_str).unwrap();
 
             //FIXME: this doesn't refresh when I navigate around by clicking links
             // reloading the page with the route '/days/:day' _does_ work
@@ -274,11 +277,38 @@ fn AocDay(read: Signal<AocInput>) -> impl IntoView {
                     .collect_view()
             });
 
+            let parts = if day < 25 {
+                vec![Part1, Part2]
+            } else {
+                vec![Part1]
+            };
+
+            let real_input_divs = maybe_real_input.clone().map(|inp| {
+                parts
+                    .into_iter()
+                    .map(|part| {
+                        console_log(format!("calculating result for real input for day {day} part {part:?}. Input: {}", inp.input).as_str());
+                        let result = solve_day(day, part.clone(), inp.input.as_str(), None);
+                        let std_duration = result.duration.to_std().unwrap();
+                        let duration_pretty = format_duration(std_duration).to_string();
+
+                        console_log(format!("calculated result for real input for day {day} part {part:?}. Result: {result:?}").as_str());
+                        div()
+                            .child(h3().child(format!("Real input {part:?}")))
+                            .child([
+                                p().child(span().class("font-bold").child("Actual Solution: ")).child(result.result),
+                                p().child(span().class("font-bold").child("Duration: ")).child(duration_pretty),
+                            ])
+                            .into_any()
+                    })
+                    .collect_view()
+            });
+
             div()
                 .child(h2().class("text-xl font-bold").child(format!("AocDay - Day {:02}", day_str)))
-                .child(div().class("flex flex-row gap-8 divide-x").child(part_divs))
+                .child(div().class("flex flex-row gap-8 divide-x").child(part_divs).child(real_input_divs))
                 .child(
-                    div().class("flex flex-col gap-4").child(h3().child("real input")).child(
+                    div().class("flex flex-col gap-4").child(h3().child("real input")).child(div().class("flex flex-row gap-4")).child(
                         textarea()
                             .readonly(true)
                             .class("w-full overflow-y-auto overflow-x-auto whitespace-pre text-inherit bg-inherit")
