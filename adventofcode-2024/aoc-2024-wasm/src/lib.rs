@@ -15,7 +15,7 @@ pub fn init_panic_hook() {
     console_error_panic_hook::set_once();
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Part {
     Part1 = 1,
     Part2 = 2,

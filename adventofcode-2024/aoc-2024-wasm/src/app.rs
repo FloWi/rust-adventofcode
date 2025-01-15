@@ -1,6 +1,6 @@
-use aoc_2024_wasm::solve_day;
 use aoc_2024_wasm::testcases::Testcase;
 use aoc_2024_wasm::Part::{Part1, Part2};
+use aoc_2024_wasm::{solve_day, Part, Solution};
 use codee::string::JsonSerdeCodec;
 use futures::FutureExt;
 use humantime::format_duration;
@@ -24,16 +24,18 @@ use rayon::prelude::*;
 use regex::Regex;
 use send_wrapper::SendWrapper;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::ops::Not;
 use web_sys::File;
 
-#[derive(Default, Deserialize, Serialize, Eq, PartialEq, Clone)]
+#[derive(Default, Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 struct AocDayInput {
     day: u32,
     input: String,
 }
 
-#[derive(Default, Deserialize, Serialize, Eq, PartialEq, Clone)]
+#[derive(Default, Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 struct AocInput {
     days: Vec<AocDayInput>,
 }
@@ -72,9 +74,10 @@ pub fn App() -> impl IntoView {
               view=AocDays // this component has an <Outlet/> for rendering the inner <AocDay> component
             >
               <Route path=path!("manage-inputs") view= move || view! { <RealInputManager read=all_real_input_files write=set_all_real_input_files /> } />
+              <Route path=path!("all-testcases") view= move || view! { <RunAllComponent aoc_input_files=all_real_input_files /> } />
               <Route
-                path=path!(":day")
-                view= move || view! { <AocDay read=all_real_input_files/> }
+                path=path!("day/:day")
+                view= move || view! { <AocDay aoc_input_files=all_real_input_files/> }
               />
               // a fallback if the /:id segment is missing from the URL
               <Route
@@ -242,7 +245,7 @@ async fn read_file_content(file: &SendWrapper<File>) -> String {
 }
 
 #[component]
-fn AocDay(read: Signal<AocInput>) -> impl IntoView {
+fn AocDay(aoc_input_files: Signal<AocInput>) -> impl IntoView {
     //let (real_inputs, _, _) = use_local_storage::<AocInput, codee::string::JsonSerdeCodec>("adventofcode-2024");
 
     let testcases_by_day = use_context::<ReadSignal<Vec<(u32, Vec<Testcase>)>>>().expect("to have found the testcases");
@@ -250,7 +253,7 @@ fn AocDay(read: Signal<AocInput>) -> impl IntoView {
     let maybe_day = move || params.read().get("day");
     let maybe_day_and_inputs = move || {
         maybe_day().map(|day_str| {
-            let maybe_real_input = read.get().days.iter().find(|d| d.day.to_string() == day_str).clone().cloned();
+            let maybe_real_input = aoc_input_files.get().days.iter().find(|d| d.day.to_string() == day_str).clone().cloned();
             (day_str, maybe_real_input)
         })
     };
@@ -321,6 +324,57 @@ fn AocDay(read: Signal<AocInput>) -> impl IntoView {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum RunTaskData {
+    RunReal { input: AocDayInput, part: Part },
+    RunTestcase { testcase: Testcase, id: usize },
+}
+
+impl RunTaskData {
+    fn id(&self) -> String {
+        match self {
+            RunTaskData::RunReal { input, part } => {
+                format!("Day {} - Part {part:?} - real", input.day)
+            }
+            RunTaskData::RunTestcase { testcase, id } => {
+                format!("Day {} - Part {:?} - testcase #{}", testcase.day, testcase.part, id)
+            }
+        }
+    }
+}
+
+impl Hash for RunTaskData {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(self.id().as_bytes())
+    }
+}
+
+#[component]
+fn RunAllComponent(aoc_input_files: Signal<AocInput>) -> impl IntoView {
+    let testcases_by_day = use_context::<ReadSignal<Vec<(u32, Vec<Testcase>)>>>().expect("to have found the testcases");
+    let all_tasks: HashMap<RunTaskData, Option<Solution>> = aoc_input_files
+        .get()
+        .days
+        .iter()
+        .map(|d| RunTaskData::RunReal { input: d.clone(), part: Part1 })
+        .chain(
+            testcases_by_day
+                .get()
+                .iter()
+                .flat_map(|(_day, testcases)| testcases.iter().enumerate().map(|(idx, tc)| RunTaskData::RunTestcase { testcase: tc.clone(), id: idx })),
+        )
+        .map(|run_task| (run_task, None))
+        .collect();
+
+    let (all_tasks, set_all_tasks) = signal(all_tasks);
+
+    move || {
+        div()
+            .class("flex flex-col gap-4")
+            .child(move || all_tasks.get().into_iter().map(|(task_data, maybe_result)| div().child(format!("{task_data:?}"))).collect_view())
+    }
+}
+
 #[component]
 fn AocDays() -> impl IntoView {
     let testcases_by_day = use_context::<ReadSignal<Vec<(u32, Vec<Testcase>)>>>().expect("to have found the testcases");
@@ -340,7 +394,7 @@ fn AocDays() -> impl IntoView {
                 // using css file to style a-tag conditionally
                 view! {
                     <li>
-                      <A href=format!("{d}")>{label}</A>
+                      <A href=format!("day/{d}")>{label}</A>
                     </li>
                 }
             })
