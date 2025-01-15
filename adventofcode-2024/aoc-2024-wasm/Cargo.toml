@@ -15,7 +15,7 @@ leptos-use = { version = "0.15.3", features = ["use_drop_zone", "docs"] }
 leptos_meta = "0.7.3"
 leptos_router = "0.7.3"
 web-sys = { version = "0.3.76", features = ["Navigator", "Clipboard"] }
-
+send_wrapper = "0.6.0"
 
 
 # Reference all your day crates
@@ -46,3 +46,5 @@ day-24 = { path = "../day-24" }
 day-25 = { path = "../day-25" }
 chrono = "0.4.39"
 humantime = "2.1.0"
+wasm-bindgen-futures = "0.4.49"
+futures = "0.3.31"

@@ -122,6 +122,7 @@ dependencies = [
  "day-23",
  "day-24",
  "day-25",
+ "futures",
  "humantime",
  "itertools",
  "leptos",
@@ -129,9 +130,11 @@ dependencies = [
  "leptos_meta",
  "leptos_router",
  "miette",
+ "send_wrapper",
  "serde",
  "serde_json",
  "toml",
+ "wasm-bindgen-futures",
  "web-sys",
 ]
 

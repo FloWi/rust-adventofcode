@@ -1,12 +1,14 @@
+use aoc_2024_wasm::solve_day;
 use aoc_2024_wasm::testcases::Testcase;
 use aoc_2024_wasm::Part::{Part1, Part2};
-use aoc_2024_wasm::{solve_day, Solution};
+use futures::FutureExt;
 use itertools::Itertools;
 use leptos::ev::click;
-use leptos::html::{button, div, h2, h3, main, p, pre, span, textarea, title, ul, Button, Div, HtmlElement};
+use leptos::html::{button, div, h2, h3, main, p, span, textarea, title, ul, Button, Div, HtmlElement};
 use leptos::leptos_dom::logging::console_log;
 use leptos::prelude::*;
 use leptos::tachys::html::class::Class;
+use leptos::task::spawn_local;
 use leptos_meta::*;
 use leptos_router::components::{Outlet, ParentRoute};
 use leptos_router::hooks::use_params_map;
@@ -14,6 +16,7 @@ use leptos_router::{
     components::{Route, Router, Routes, A},
     path,
 };
+use std::ops::Not;
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -126,8 +129,10 @@ fn styled_button() -> HtmlElement<Button, (Class<&'static str>,), ()> {
     button().class("inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3")
 }
 
-use leptos_use::docs::{demo_or_body, BooleanDisplay};
+use leptos_use::docs::BooleanDisplay;
 use leptos_use::{use_drop_zone_with_options, UseDropZoneOptions, UseDropZoneReturn};
+use send_wrapper::SendWrapper;
+use web_sys::File;
 
 #[component]
 fn RealInputManager() -> impl IntoView {
@@ -157,6 +162,15 @@ fn RealInputManager() -> impl IntoView {
             .collect_view()
     };
 
+    let store_files_button = move || {
+        //
+        files
+            .get()
+            .is_empty()
+            .not()
+            .then_some(styled_button().child("Store files in localstorage").onclick(spawn_local(store_files_in_localstorage(files.get()))))
+    };
+
     view! {
         <div class="flex">
             <div class="w-full h-auto relative">
@@ -174,10 +188,30 @@ fn RealInputManager() -> impl IntoView {
                     <div class="flex flex-wrap justify-center items-center">
                       {file_divs}
                     </div>
+                    <div class="flex flex-wrap justify-center items-center">
+                      {move || store_files_button()}
+                    </div>
                 </div>
             </div>
         </div>
     }
+}
+
+async fn store_files_in_localstorage(files: Vec<SendWrapper<File>>) {
+    let files_with_contents = futures::future::join_all(files.iter().map(|file| read_file_content(file).map(|c| (file.name(), c)))).await;
+
+    for (name, content) in files_with_contents {
+        console_log(format!("Got file '{name}' with content (trimmed 100): '{}'", content.split_at(100).0).as_str());
+    }
+}
+
+async fn store_file_contents_in_local_storage() {
+
+}
+
+async fn read_file_content(file: &SendWrapper<File>) -> String {
+    let text_blob = file.text();
+    (async move { wasm_bindgen_futures::JsFuture::from(text_blob).await.unwrap().as_string().unwrap() }).await
 }
 
 #[component]
