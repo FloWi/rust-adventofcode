@@ -24,6 +24,17 @@ use serde::{Deserialize, Serialize};
 use std::ops::Not;
 use web_sys::File;
 
+#[derive(Default, Deserialize, Serialize, Eq, PartialEq, Clone)]
+struct AocDayInput {
+    day: u32,
+    input: String,
+}
+
+#[derive(Default, Deserialize, Serialize, Eq, PartialEq, Clone)]
+struct AocInput {
+    days: Vec<AocDayInput>,
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     provide_meta_context();
@@ -42,6 +53,7 @@ pub fn App() -> impl IntoView {
     let (testcases_by_day, _set_testcases_by_day) = signal(testcases_by_day);
 
     provide_context(testcases_by_day);
+    let (all_real_input_files, set_all_real_input_files, _) = use_local_storage::<AocInput, codee::string::JsonSerdeCodec>("adventofcode-2024");
 
     view! {
         <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico"/>
@@ -56,10 +68,10 @@ pub fn App() -> impl IntoView {
               path=path!("adventofcode-2024")
               view=AocDays // this component has an <Outlet/> for rendering the inner <AocDay> component
             >
-              <Route path=path!("manage-inputs") view=RealInputManager />
+              <Route path=path!("manage-inputs") view= move || view! { <RealInputManager read=all_real_input_files write=set_all_real_input_files /> } />
               <Route
                 path=path!(":day")
-                view=AocDay
+                view= move || view! { <AocDay read=all_real_input_files/> }
               />
               // a fallback if the /:id segment is missing from the URL
               <Route
@@ -136,7 +148,7 @@ fn styled_button() -> HtmlElement<Button, (Class<&'static str>,), ()> {
 }
 
 #[component]
-fn RealInputManager() -> impl IntoView {
+fn RealInputManager(read: Signal<AocInput>, write: WriteSignal<AocInput>) -> impl IntoView {
     let (dropped, set_dropped) = signal(false);
 
     let drop_zone_el = NodeRef::<Div>::new();
@@ -169,7 +181,7 @@ fn RealInputManager() -> impl IntoView {
             .get()
             .is_empty()
             .not()
-            .then_some(styled_button().child("Store files in localstorage").onclick(move || spawn_local(store_files_in_localstorage(files.get()))))
+            .then_some(styled_button().child("Store files in localstorage").onclick(move || spawn_local(store_files_in_localstorage(files.get(), write))))
     };
 
     view! {
@@ -198,18 +210,7 @@ fn RealInputManager() -> impl IntoView {
     }
 }
 
-#[derive(Default, Deserialize, Serialize, Eq, PartialEq, Clone)]
-struct AocDayInput {
-    day: u32,
-    input: String,
-}
-
-#[derive(Default, Deserialize, Serialize, Eq, PartialEq, Clone)]
-struct AocInput {
-    days: Vec<AocDayInput>,
-}
-
-async fn store_files_in_localstorage(files: Vec<SendWrapper<File>>) {
+async fn store_files_in_localstorage(files: Vec<SendWrapper<File>>, set_all_real_input_files: WriteSignal<AocInput>) {
     let files_with_contents = futures::future::join_all(files.iter().map(|file| read_file_content(file).map(|c| (file.name(), c)))).await;
 
     let content = files_with_contents
@@ -225,8 +226,7 @@ async fn store_files_in_localstorage(files: Vec<SendWrapper<File>>) {
     let serialized = serde_json::to_string_pretty(&content).unwrap();
     console_log(serialized.as_str());
 
-    let (real_input, set_real_input, delete_fn) = use_local_storage::<AocInput, codee::string::JsonSerdeCodec>("adventofcode-2024");
-    set_real_input.set(AocInput { days: content });
+    set_all_real_input_files.set(AocInput { days: content });
 }
 
 fn parse_day_from_file(filename: &str) -> Option<u32> {
@@ -240,15 +240,22 @@ async fn read_file_content(file: &SendWrapper<File>) -> String {
 }
 
 #[component]
-fn AocDay() -> impl IntoView {
-    let testcases_by_day = use_context::<ReadSignal<Vec<(u32, Vec<Testcase>)>>>().expect("to have found the testcases");
+fn AocDay(read: Signal<AocInput>) -> impl IntoView {
+    //let (real_inputs, _, _) = use_local_storage::<AocInput, codee::string::JsonSerdeCodec>("adventofcode-2024");
 
+    let testcases_by_day = use_context::<ReadSignal<Vec<(u32, Vec<Testcase>)>>>().expect("to have found the testcases");
     let params = use_params_map();
     let maybe_day = move || params.read().get("day");
+    let maybe_day_and_inputs = move || {
+        maybe_day().map(|day_str| {
+            let maybe_real_input = read.get().days.iter().find(|d| d.day.to_string() == day_str).clone().cloned();
+            (day_str, maybe_real_input)
+        })
+    };
 
     move || {
-        maybe_day().map(|day| {
-            let maybe_testcases_for_day = testcases_by_day.read().iter().cloned().find(|(d, _)| d.to_string() == day);
+        maybe_day_and_inputs().map(|(day_str, maybe_real_input)| {
+            let maybe_testcases_for_day = testcases_by_day.read().iter().cloned().find(|(d, _)| d.to_string() == day_str);
 
             //FIXME: this doesn't refresh when I navigate around by clicking links
             // reloading the page with the route '/days/:day' _does_ work
@@ -268,8 +275,18 @@ fn AocDay() -> impl IntoView {
             });
 
             div()
-                .child(h2().class("text-xl font-bold").child(format!("AocDay - Day {:02}", day)))
+                .child(h2().class("text-xl font-bold").child(format!("AocDay - Day {:02}", day_str)))
                 .child(div().class("flex flex-row gap-8 divide-x").child(part_divs))
+                .child(
+                    div().class("flex flex-col gap-4").child(h3().child("real input")).child(
+                        textarea()
+                            .readonly(true)
+                            .class("w-full overflow-y-auto overflow-x-auto whitespace-pre text-inherit bg-inherit")
+                            .child(maybe_real_input.map(|real| real.input))
+                            .rows(40)
+                            .cols(40),
+                    ),
+                )
         })
     }
 }
