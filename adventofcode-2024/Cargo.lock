@@ -96,6 +96,7 @@ name = "aoc-2024-wasm"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "codee",
  "console_error_panic_hook",
  "day-01",
  "day-02",
@@ -130,6 +131,7 @@ dependencies = [
  "leptos_meta",
  "leptos_router",
  "miette",
+ "regex",
  "send_wrapper",
  "serde",
  "serde_json",

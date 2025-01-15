@@ -3,7 +3,6 @@ use aoc_2024_wasm::testcases::Testcase;
 use aoc_2024_wasm::Part::{Part1, Part2};
 use futures::FutureExt;
 use itertools::Itertools;
-use leptos::ev::click;
 use leptos::html::{button, div, h2, h3, main, p, span, textarea, title, ul, Button, Div, HtmlElement};
 use leptos::leptos_dom::logging::console_log;
 use leptos::prelude::*;
@@ -16,7 +15,14 @@ use leptos_router::{
     components::{Route, Router, Routes, A},
     path,
 };
+use leptos_use::docs::BooleanDisplay;
+use leptos_use::storage::use_local_storage;
+use leptos_use::{use_drop_zone_with_options, UseDropZoneOptions, UseDropZoneReturn};
+use regex::Regex;
+use send_wrapper::SendWrapper;
+use serde::{Deserialize, Serialize};
 use std::ops::Not;
+use web_sys::File;
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -115,7 +121,7 @@ fn AocTestcase(testcase: Testcase) -> impl IntoView {
         //testcase.args.map(|args| p().child(span().class("font-bold").child("Custom Args: ")).child(args)),
         testcase.args.map(|arg| p().child(span().class("font-bold").child("Custom Args: ")).child(span().child(arg))),
         p().class("font-bold mt-4").child(span().child("Testdata:")),
-        styled_button().on(click, move |_| write_to_clipboard(testcase_input.as_str())).child("Copy"),
+        styled_button().on(leptos::ev::click, move |_| write_to_clipboard(testcase_input.as_str())).child("Copy"),
         textarea()
             .readonly(true)
             .class("w-full overflow-y-auto overflow-x-auto whitespace-pre text-inherit bg-inherit")
@@ -128,11 +134,6 @@ fn AocTestcase(testcase: Testcase) -> impl IntoView {
 fn styled_button() -> HtmlElement<Button, (Class<&'static str>,), ()> {
     button().class("inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3")
 }
-
-use leptos_use::docs::BooleanDisplay;
-use leptos_use::{use_drop_zone_with_options, UseDropZoneOptions, UseDropZoneReturn};
-use send_wrapper::SendWrapper;
-use web_sys::File;
 
 #[component]
 fn RealInputManager() -> impl IntoView {
@@ -168,7 +169,7 @@ fn RealInputManager() -> impl IntoView {
             .get()
             .is_empty()
             .not()
-            .then_some(styled_button().child("Store files in localstorage").onclick(spawn_local(store_files_in_localstorage(files.get()))))
+            .then_some(styled_button().child("Store files in localstorage").onclick(move || spawn_local(store_files_in_localstorage(files.get()))))
     };
 
     view! {
@@ -197,16 +198,40 @@ fn RealInputManager() -> impl IntoView {
     }
 }
 
+#[derive(Default, Deserialize, Serialize, Eq, PartialEq, Clone)]
+struct AocDayInput {
+    day: u32,
+    input: String,
+}
+
+#[derive(Default, Deserialize, Serialize, Eq, PartialEq, Clone)]
+struct AocInput {
+    days: Vec<AocDayInput>,
+}
+
 async fn store_files_in_localstorage(files: Vec<SendWrapper<File>>) {
     let files_with_contents = futures::future::join_all(files.iter().map(|file| read_file_content(file).map(|c| (file.name(), c)))).await;
 
-    for (name, content) in files_with_contents {
-        console_log(format!("Got file '{name}' with content (trimmed 100): '{}'", content.split_at(100).0).as_str());
-    }
+    let content = files_with_contents
+        .iter()
+        .cloned()
+        .map(|(name, content)| {
+            let day: u32 = parse_day_from_file(&name).unwrap();
+            AocDayInput { day, input: content }
+        })
+        .collect_vec();
+
+    console_log(format!("content for all {} days", files.len()).as_str());
+    let serialized = serde_json::to_string_pretty(&content).unwrap();
+    console_log(serialized.as_str());
+
+    let (real_input, set_real_input, delete_fn) = use_local_storage::<AocInput, codee::string::JsonSerdeCodec>("adventofcode-2024");
+    set_real_input.set(AocInput { days: content });
 }
 
-async fn store_file_contents_in_local_storage() {
-
+fn parse_day_from_file(filename: &str) -> Option<u32> {
+    let re = Regex::new(r"\d+").unwrap();
+    re.find(filename)?.as_str().parse().ok()
 }
 
 async fn read_file_content(file: &SendWrapper<File>) -> String {

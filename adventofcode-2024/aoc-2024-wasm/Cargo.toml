@@ -11,7 +11,10 @@ console_error_panic_hook = { workspace = true }
 itertools = { workspace = true }
 miette = { workspace = true }
 leptos = { version = "0.7.3", features = ["csr"] }
-leptos-use = { version = "0.15.3", features = ["use_drop_zone", "docs"] }
+# can't use latest version (0.15.3), because it breaks codee dependency
+leptos-use = { version = "0.15.2", features = ["use_drop_zone", "docs", "storage"] }
+# can't use latest version (0.3.0), because leptos server depends on codee 0.2.0
+codee = { version = "0.2.0", features = ["json_serde"] }
 leptos_meta = "0.7.3"
 leptos_router = "0.7.3"
 web-sys = { version = "0.3.76", features = ["Navigator", "Clipboard"] }
@@ -48,3 +51,4 @@ chrono = "0.4.39"
 humantime = "2.1.0"
 wasm-bindgen-futures = "0.4.49"
 futures = "0.3.31"
+regex = "1.11.1"
