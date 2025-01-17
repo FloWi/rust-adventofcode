@@ -28,7 +28,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::ops::Not;
-use std::thread::sleep;
 use std::time::Duration;
 use web_sys::File;
 
@@ -368,6 +367,15 @@ impl TaskStore {
             is_running: false,
         }
     }
+
+    fn all_tasks_with_results(&self) -> Vec<(RunTaskData, Option<String>)> {
+        self.tasks
+            .iter()
+            .map(|t| (t.clone(), None))
+            .chain(self.results.iter().map(|(t, res)| (t.clone(), Some(res.clone()))))
+            .sorted_by_key(|(t, _)| t.id())
+            .collect_vec()
+    }
 }
 
 #[component]
@@ -384,6 +392,7 @@ fn RunAllComponent(aoc_input_files: Signal<AocInput>) -> impl IntoView {
                 .iter()
                 .flat_map(|(_day, testcases)| testcases.iter().enumerate().map(|(idx, tc)| RunTaskData::RunTestcase { testcase: tc.clone(), id: idx })),
         )
+        .sorted_by_key(|t| t.id())
         .collect_vec();
 
     let (store, set_store) = signal(TaskStore::new(all_tasks));
@@ -423,24 +432,26 @@ fn RunAllComponent(aoc_input_files: Signal<AocInput>) -> impl IntoView {
             <div class="mb-4">
                 <h2 class="text-xl mb-2">"Tasks:"</h2>
                 <div class="space-y-2">
-                    {move || store.get().tasks.iter().map(|task| {
-                        (view! {
-                            <div class="p-2 bg-gray-100 rounded">
-                                <div class="font-bold">{format!("{:?}", task)}</div>
-                                <div class="text-gray-500">"Pending..."</div>
-                            </div>
-                        }).into_any()
-                    }).chain(
-                        // Show completed tasks with results
-                        store.get().results.iter().map(|(task, result)| {
+                    {move || store.get().all_tasks_with_results().into_iter().map(|(task, maybe_result)| {
+                        match maybe_result {
+                        None => {
                             (view! {
-                                <div class="p-2 bg-green-100 rounded">
+                                <div class="p-2 bg-gray-800 rounded">
                                     <div class="font-bold">{format!("{:?}", task)}</div>
-                                    <div class="mt-1">{result.clone()}</div>
+                                    <div class="text-gray-500">"Pending..."</div>
                                 </div>
                             }).into_any()
-                        })
-                    ).collect_view()}
+                            },
+                            Some(result) => {
+                                (view! {
+                                    <div class="p-2 bg-green-800 rounded">
+                                        <div class="font-bold">{format!("{:?}", task)}</div>
+                                        <div class="mt-1">{result}</div>
+                                    </div>
+                                }).into_any()
+                            }
+                        }
+                    }).collect_view()}
                 </div>
             </div>
 
