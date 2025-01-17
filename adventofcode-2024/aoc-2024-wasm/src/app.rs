@@ -1,12 +1,13 @@
 use aoc_2024_wasm::testcases::Testcase;
 use aoc_2024_wasm::Part::{Part1, Part2};
-use aoc_2024_wasm::{solve_day, Part, Solution};
+use aoc_2024_wasm::{solve_day, Part};
 use codee::string::JsonSerdeCodec;
 use futures::FutureExt;
 use humantime::format_duration;
 use itertools::Itertools;
 use leptos::html::{button, div, h2, h3, main, p, span, textarea, title, ul, Button, Div, HtmlElement};
 use leptos::leptos_dom::logging::console_log;
+use leptos::logging::log;
 use leptos::prelude::*;
 use leptos::tachys::html::class::Class;
 use leptos::task::spawn_local;
@@ -24,9 +25,11 @@ use rayon::prelude::*;
 use regex::Regex;
 use send_wrapper::SendWrapper;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::ops::Not;
+use std::thread::sleep;
+use std::time::Duration;
 use web_sys::File;
 
 #[derive(Default, Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
@@ -349,11 +352,29 @@ impl Hash for RunTaskData {
     }
 }
 
+// Store Component
+#[derive(Clone)]
+struct TaskStore {
+    tasks: VecDeque<RunTaskData>,
+    results: HashMap<RunTaskData, String>,
+    is_running: bool,
+}
+
+impl TaskStore {
+    fn new(tasks: Vec<RunTaskData>) -> Self {
+        Self {
+            tasks: VecDeque::from(tasks),
+            results: HashMap::new(),
+            is_running: false,
+        }
+    }
+}
+
 #[component]
 fn RunAllComponent(aoc_input_files: Signal<AocInput>) -> impl IntoView {
     let testcases_by_day = use_context::<ReadSignal<Vec<(u32, Vec<Testcase>)>>>().expect("to have found the testcases");
-    let all_tasks: HashMap<RunTaskData, Option<Solution>> = aoc_input_files
-        .get()
+    let all_tasks: Vec<RunTaskData> = aoc_input_files
+        .get_untracked()
         .days
         .iter()
         .map(|d| RunTaskData::RunReal { input: d.clone(), part: Part1 })
@@ -363,16 +384,76 @@ fn RunAllComponent(aoc_input_files: Signal<AocInput>) -> impl IntoView {
                 .iter()
                 .flat_map(|(_day, testcases)| testcases.iter().enumerate().map(|(idx, tc)| RunTaskData::RunTestcase { testcase: tc.clone(), id: idx })),
         )
-        .map(|run_task| (run_task, None))
-        .collect();
+        .collect_vec();
 
-    let (all_tasks, set_all_tasks) = signal(all_tasks);
+    let (store, set_store) = signal(TaskStore::new(all_tasks));
 
-    move || {
-        div()
-            .class("flex flex-col gap-4")
-            .child(move || all_tasks.get().into_iter().map(|(task_data, maybe_result)| div().child(format!("{task_data:?}"))).collect_view())
+    let run_tasks = Action::new_local(move |_: &()| async move {
+        let mut current_store = store.get();
+        current_store.is_running = true;
+        set_store.set(current_store.clone());
+
+        while let Some(task) = current_store.tasks.pop_front() {
+            let result = run_task(&task).await;
+            current_store.results.insert(task.clone(), result);
+            set_store.set(current_store.clone());
+        }
+
+        current_store.is_running = false;
+        set_store.set(current_store);
+    });
+
+    view! {
+        <div class="p-4">
+            <h1 class="text-2xl font-bold mb-4">"Advent of Code Tasks"</h1>
+
+            <button
+                    class="bg-blue-500 text-white px-4 py-2 rounded disabled:bg-gray-400"
+                    disabled={move || store.get().is_running || store.get().tasks.is_empty()}
+                    on:click=move |_| {run_tasks.dispatch(());}
+                >
+                    {move || if store.get().is_running {
+                        "Running..."
+                    } else {
+                        "Run All Tasks"
+                    }}
+            </button>
+
+            // Combined Tasks and Results view
+            <div class="mb-4">
+                <h2 class="text-xl mb-2">"Tasks:"</h2>
+                <div class="space-y-2">
+                    {move || store.get().tasks.iter().map(|task| {
+                        (view! {
+                            <div class="p-2 bg-gray-100 rounded">
+                                <div class="font-bold">{format!("{:?}", task)}</div>
+                                <div class="text-gray-500">"Pending..."</div>
+                            </div>
+                        }).into_any()
+                    }).chain(
+                        // Show completed tasks with results
+                        store.get().results.iter().map(|(task, result)| {
+                            (view! {
+                                <div class="p-2 bg-green-100 rounded">
+                                    <div class="font-bold">{format!("{:?}", task)}</div>
+                                    <div class="mt-1">{result.clone()}</div>
+                                </div>
+                            }).into_any()
+                        })
+                    ).collect_view()}
+                </div>
+            </div>
+
+
+        </div>
     }
+}
+
+async fn run_task(task: &RunTaskData) -> String {
+    log!("running {}", task.id());
+    gloo_timers::future::sleep(Duration::from_millis(250)).await;
+    log!("ran {}", task.id());
+    format!("ran {}", task.id())
 }
 
 #[component]

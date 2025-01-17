@@ -124,6 +124,7 @@ dependencies = [
  "day-24",
  "day-25",
  "futures",
+ "gloo-timers",
  "humantime",
  "itertools",
  "leptos",
