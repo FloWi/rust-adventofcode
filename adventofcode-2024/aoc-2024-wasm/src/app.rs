@@ -2,6 +2,7 @@ use crate::run_tasks_component::RunTasksComponent;
 use aoc_2024_wasm::testcases::Testcase;
 use aoc_2024_wasm::Part::{Part1, Part2};
 use aoc_2024_wasm::{solve_day, Part, Solution};
+use chrono::Local;
 use codee::string::JsonSerdeCodec;
 use futures::FutureExt;
 use humantime::format_duration;
@@ -355,27 +356,46 @@ impl Hash for RunTaskData {
 // Store Component
 #[derive(Clone)]
 pub(crate) struct TaskStore {
-    pub(crate) tasks: VecDeque<RunTaskData>,
-    results: HashMap<RunTaskData, Solution>,
-    pub(crate) is_running: bool,
+    results: HashMap<RunTaskData, (ReadSignal<Option<Solution>>, WriteSignal<Option<Solution>>)>,
+    pub(crate) result_signals: Vec<(RunTaskData, ReadSignal<Option<Solution>>)>,
+    pub(crate) is_running: ReadSignal<bool>,
+    set_is_running: WriteSignal<bool>,
 }
 
 impl TaskStore {
     fn new(tasks: Vec<RunTaskData>) -> Self {
+        let results: HashMap<RunTaskData, (ReadSignal<Option<Solution>>, WriteSignal<Option<Solution>>)> =
+            tasks.iter().map(|t| (t.clone(), signal(None))).collect();
+        let result_signals = results.iter().map(|(t, signals)| (t.clone(), signals.0)).collect_vec();
+        let (is_running, set_is_running) = signal(false);
         Self {
-            tasks: VecDeque::from(tasks),
-            results: HashMap::new(),
-            is_running: false,
+            results,
+            result_signals,
+            is_running,
+            set_is_running,
         }
     }
 
-    pub(crate) fn all_tasks_with_results(&self) -> Vec<(RunTaskData, Option<Solution>)> {
-        self.tasks
-            .iter()
-            .map(|t| (t.clone(), None))
-            .chain(self.results.iter().map(|(t, res)| (t.clone(), Some(res.clone()))))
-            .sorted_by_key(|(t, _)| t.id())
-            .collect_vec()
+    pub async fn run(&self) {
+        self.set_is_running.set(true);
+
+        let mut tasks_queue: VecDeque<&RunTaskData> = VecDeque::from(
+            self.results
+                .keys()
+                .filter(|t| {
+                    match t {
+                        RunTaskData::RunReal { input, part } => input.day != 9, // skip slow-running task while developing
+                        RunTaskData::RunTestcase { .. } => true,
+                    }
+                })
+                .collect_vec(),
+        );
+
+        while let Some(task) = tasks_queue.pop_front() {
+            let result = run_task(task).await;
+            self.results.get(task).unwrap().1.set(Some(result));
+        }
+        self.set_is_running.set(false);
     }
 }
 
@@ -396,33 +416,15 @@ fn RunAllComponent(aoc_input_files: Signal<AocInput>) -> impl IntoView {
         .sorted_by_key(|t| t.id())
         .collect_vec();
 
-    let (store, set_store): (ReadSignal<TaskStore>, WriteSignal<TaskStore>) = signal(TaskStore::new(all_tasks));
+    let store: TaskStore = TaskStore::new(all_tasks);
 
-    let run_tasks: Action<(), (), LocalStorage> = Action::new_local(move |_: &()| async move {
-        let mut current_store = store.get();
-        current_store.is_running = true;
-        set_store.set(current_store.clone());
-
-        while let Some(task) = current_store.tasks.pop_front() {
-            let result = run_task(&task).await;
-            current_store.results.insert(task.clone(), result);
-            set_store.set(current_store.clone());
-        }
-
-        current_store.is_running = false;
-        set_store.set(current_store);
-    });
-
-    move || {
-        view! {
-            <RunTasksComponent store={store} run_tasks={run_tasks} />
-        }
+    view! {
+        <RunTasksComponent store={store} />
     }
 }
 
 async fn run_task(task: &RunTaskData) -> Solution {
     log!("running {}", task.id());
-    gloo_timers::future::sleep(Duration::from_micros(1)).await; // to enforce yielding. //TODO find better way?
     let result = match task {
         RunTaskData::RunReal { input, part } => solve_day(input.day, part.clone(), &input.input, None),
         RunTaskData::RunTestcase { testcase, .. } => {
