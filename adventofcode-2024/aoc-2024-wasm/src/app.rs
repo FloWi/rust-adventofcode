@@ -2,7 +2,7 @@ use crate::run_tasks_component::RunTasksComponent;
 use aoc_2024_wasm::testcases::Testcase;
 use aoc_2024_wasm::Part::{Part1, Part2};
 use aoc_2024_wasm::{solve_day, Part, Solution};
-use chrono::Local;
+use chrono::{DateTime, Local, Utc};
 use codee::string::JsonSerdeCodec;
 use futures::FutureExt;
 use humantime::format_duration;
@@ -353,13 +353,20 @@ impl Hash for RunTaskData {
     }
 }
 
+#[derive(Clone)]
+pub enum Status {
+    NotStarted,
+    Done { start_time: DateTime<Utc>, end_time: DateTime<Utc> },
+    Running { start_time: DateTime<Utc>, num_tasks_done: u32 },
+}
+
 // Store Component
 #[derive(Clone)]
-pub(crate) struct TaskStore {
+pub struct TaskStore {
     results: HashMap<RunTaskData, (ReadSignal<Option<Solution>>, WriteSignal<Option<Solution>>)>,
-    pub(crate) result_signals: Vec<(RunTaskData, ReadSignal<Option<Solution>>)>,
-    pub(crate) is_running: ReadSignal<bool>,
-    set_is_running: WriteSignal<bool>,
+    pub result_signals: Vec<(RunTaskData, ReadSignal<Option<Solution>>)>,
+    pub status: ReadSignal<Status>,
+    set_status: WriteSignal<Status>,
 }
 
 impl TaskStore {
@@ -367,35 +374,46 @@ impl TaskStore {
         let results: HashMap<RunTaskData, (ReadSignal<Option<Solution>>, WriteSignal<Option<Solution>>)> =
             tasks.iter().map(|t| (t.clone(), signal(None))).collect();
         let result_signals = results.iter().map(|(t, signals)| (t.clone(), signals.0)).collect_vec();
-        let (is_running, set_is_running) = signal(false);
+        let (status, set_status) = signal(Status::NotStarted);
         Self {
             results,
             result_signals,
-            is_running,
-            set_is_running,
+            status,
+            set_status,
         }
     }
 
     pub async fn run(&self) {
-        self.set_is_running.set(true);
+        let start_time = Utc::now();
+        self.set_status.set(Status::Running { num_tasks_done: 0, start_time });
 
         let mut tasks_queue: VecDeque<&RunTaskData> = VecDeque::from(
             self.results
                 .keys()
-                .filter(|t| {
-                    match t {
-                        RunTaskData::RunReal { input, part } => input.day != 9, // skip slow-running task while developing
-                        RunTaskData::RunTestcase { .. } => true,
-                    }
-                })
+                // .filter(|t| {
+                //     match t {
+                //         RunTaskData::RunReal { input, part } => input.day != 9 && input.day != 12, // skip slow-running task while developing
+                //         RunTaskData::RunTestcase { .. } => true,
+                //     }
+                // })
                 .collect_vec(),
         );
 
+        let mut num_tasks_done = 0;
+
         while let Some(task) = tasks_queue.pop_front() {
             let result = run_task(task).await;
+            num_tasks_done += 1;
             self.results.get(task).unwrap().1.set(Some(result));
+            self.set_status.set(Status::Running { num_tasks_done, start_time });
+
+            //TODO: figure out how to properly yield to UI thread (or rather give it time to catch on)
+            gloo_timers::future::sleep(Duration::from_micros(1)).await;
         }
-        self.set_is_running.set(false);
+        self.set_status.set(Status::Done {
+            start_time,
+            end_time: Utc::now(),
+        });
     }
 }
 
