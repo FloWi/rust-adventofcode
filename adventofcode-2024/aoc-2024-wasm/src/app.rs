@@ -1,6 +1,7 @@
+use crate::run_tasks_component::RunTasksComponent;
 use aoc_2024_wasm::testcases::Testcase;
 use aoc_2024_wasm::Part::{Part1, Part2};
-use aoc_2024_wasm::{solve_day, Part};
+use aoc_2024_wasm::{solve_day, Part, Solution};
 use codee::string::JsonSerdeCodec;
 use futures::FutureExt;
 use humantime::format_duration;
@@ -327,7 +328,7 @@ fn AocDay(aoc_input_files: Signal<AocInput>) -> impl IntoView {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum RunTaskData {
+pub enum RunTaskData {
     RunReal { input: AocDayInput, part: Part },
     RunTestcase { testcase: Testcase, id: usize },
 }
@@ -353,10 +354,10 @@ impl Hash for RunTaskData {
 
 // Store Component
 #[derive(Clone)]
-struct TaskStore {
-    tasks: VecDeque<RunTaskData>,
-    results: HashMap<RunTaskData, String>,
-    is_running: bool,
+pub(crate) struct TaskStore {
+    pub(crate) tasks: VecDeque<RunTaskData>,
+    results: HashMap<RunTaskData, Solution>,
+    pub(crate) is_running: bool,
 }
 
 impl TaskStore {
@@ -368,7 +369,7 @@ impl TaskStore {
         }
     }
 
-    fn all_tasks_with_results(&self) -> Vec<(RunTaskData, Option<String>)> {
+    pub(crate) fn all_tasks_with_results(&self) -> Vec<(RunTaskData, Option<Solution>)> {
         self.tasks
             .iter()
             .map(|t| (t.clone(), None))
@@ -395,9 +396,9 @@ fn RunAllComponent(aoc_input_files: Signal<AocInput>) -> impl IntoView {
         .sorted_by_key(|t| t.id())
         .collect_vec();
 
-    let (store, set_store) = signal(TaskStore::new(all_tasks));
+    let (store, set_store): (ReadSignal<TaskStore>, WriteSignal<TaskStore>) = signal(TaskStore::new(all_tasks));
 
-    let run_tasks = Action::new_local(move |_: &()| async move {
+    let run_tasks: Action<(), (), LocalStorage> = Action::new_local(move |_: &()| async move {
         let mut current_store = store.get();
         current_store.is_running = true;
         set_store.set(current_store.clone());
@@ -412,59 +413,26 @@ fn RunAllComponent(aoc_input_files: Signal<AocInput>) -> impl IntoView {
         set_store.set(current_store);
     });
 
-    view! {
-        <div class="p-4">
-            <h1 class="text-2xl font-bold mb-4">"Advent of Code Tasks"</h1>
-
-            <button
-                    class="bg-blue-500 text-white px-4 py-2 rounded disabled:bg-gray-400"
-                    disabled={move || store.get().is_running || store.get().tasks.is_empty()}
-                    on:click=move |_| {run_tasks.dispatch(());}
-                >
-                    {move || if store.get().is_running {
-                        "Running..."
-                    } else {
-                        "Run All Tasks"
-                    }}
-            </button>
-
-            // Combined Tasks and Results view
-            <div class="mb-4">
-                <h2 class="text-xl mb-2">"Tasks:"</h2>
-                <div class="space-y-2">
-                    {move || store.get().all_tasks_with_results().into_iter().map(|(task, maybe_result)| {
-                        match maybe_result {
-                        None => {
-                            (view! {
-                                <div class="p-2 bg-gray-800 rounded">
-                                    <div class="font-bold">{format!("{:?}", task)}</div>
-                                    <div class="text-gray-500">"Pending..."</div>
-                                </div>
-                            }).into_any()
-                            },
-                            Some(result) => {
-                                (view! {
-                                    <div class="p-2 bg-green-800 rounded">
-                                        <div class="font-bold">{format!("{:?}", task)}</div>
-                                        <div class="mt-1">{result}</div>
-                                    </div>
-                                }).into_any()
-                            }
-                        }
-                    }).collect_view()}
-                </div>
-            </div>
-
-
-        </div>
+    move || {
+        view! {
+            <RunTasksComponent store={store} run_tasks={run_tasks} />
+        }
     }
 }
 
-async fn run_task(task: &RunTaskData) -> String {
+async fn run_task(task: &RunTaskData) -> Solution {
     log!("running {}", task.id());
-    gloo_timers::future::sleep(Duration::from_millis(250)).await;
+    gloo_timers::future::sleep(Duration::from_micros(1)).await; // to enforce yielding. //TODO find better way?
+    let result = match task {
+        RunTaskData::RunReal { input, part } => solve_day(input.day, part.clone(), &input.input, None),
+        RunTaskData::RunTestcase { testcase, .. } => {
+            let part: Part = testcase.part.try_into().unwrap();
+            solve_day(testcase.day, part, &testcase.input, testcase.args.clone())
+        }
+    };
+
     log!("ran {}", task.id());
-    format!("ran {}", task.id())
+    result
 }
 
 #[component]
@@ -493,30 +461,19 @@ fn AocDays() -> impl IntoView {
             .collect_view(),
     );
 
-    // needed to increase both max_width and chain_width to 160 in rustfmt for this to work
+    let other_links_html = view! {
+        <ul>
+        <li><A href=format!("manage-inputs")>"manage inputs"</A></li>
+        <li><A href=format!("all-testcases")>"all testcases"</A></li>
+        </ul>
+    };
 
-    // thanks to https://tailwindcomponents.com/component/blue-buttons-example for the showcase layout
-    // can't put Title and main into an array or vec, because this break the type-checker - a tuple works fine.
-    let nav_bar = div().class("flex flex-col min-w-fit").child(days_html);
+    let nav_bar = div().class("flex flex-col min-w-fit gap-4 divide-y").child(days_html).child(other_links_html);
 
     div().class("bg-gradient-to-tl from-blue-800 to-blue-500 text-white font-mono flex flex-col min-h-screen").child((
-        title().child("Leptos + Tailwindcss"),
+        title().child("Advent Of Code 2024"),
         main().child(
             div().class("bg-gradient-to-tl from-blue-800 to-blue-500 text-white font-mono flex flex-row min-w-screen gap-8 p-8").child((nav_bar, Outlet())),
         ),
     ))
 }
-/*
-{
-    #[allow(unused_braces)] {
-        ::leptos::prelude::View::new(::leptos::tachys::html::element::button
-            ().child(#[allow(unused_braces)] {
-            "Copy to Clipboard"
-        }).class("btn btn-accent w-full"
-        ).on(::leptos::tachys::html::event::click, move |_| {
-            write_to_clipboard(testcase_input.as_str())
-        },
-        ))
-    }
-}
- */

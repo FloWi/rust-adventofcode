@@ -1,4 +1,5 @@
 mod app;
+mod run_tasks_component;
 
 use app::*;
 use leptos::{logging, mount};

@@ -1,7 +1,9 @@
 pub mod testcases;
 
 use crate::testcases::{read_all_testcases, Testcase};
+use crate::Part::{Part1, Part2};
 use chrono::{Duration, TimeDelta, Utc};
+use leptos::attr::r#for;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
@@ -19,6 +21,18 @@ pub fn init_panic_hook() {
 pub enum Part {
     Part1 = 1,
     Part2 = 2,
+}
+
+impl TryFrom<u32> for Part {
+    type Error = String;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Part1),
+            2 => Ok(Part2),
+            unknown => Err(format!("Unknown Part {unknown}")),
+        }
+    }
 }
 
 pub fn solve_day(day: u32, part: Part, input: &str, maybe_args: Option<String>) -> Solution {
