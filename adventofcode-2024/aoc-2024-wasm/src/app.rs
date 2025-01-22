@@ -335,13 +335,13 @@ pub enum RunTaskData {
 }
 
 impl RunTaskData {
-    fn id(&self) -> String {
+    pub(crate) fn id(&self) -> String {
         match self {
             RunTaskData::RunReal { input, part } => {
-                format!("Day {} - Part {part:?} - real", input.day)
+                format!("Day {:02} - Part {part:?} - real", input.day)
             }
             RunTaskData::RunTestcase { testcase, id } => {
-                format!("Day {} - Part {:?} - testcase #{}", testcase.day, testcase.part, id)
+                format!("Day {:02} - Part {:?} - testcase #{}", testcase.day, testcase.part, id)
             }
         }
     }
@@ -396,6 +396,7 @@ impl TaskStore {
                 //         RunTaskData::RunTestcase { .. } => true,
                 //     }
                 // })
+                .sorted_by_key(|t| t.id())
                 .collect_vec(),
         );
 

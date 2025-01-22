@@ -1,6 +1,7 @@
 use crate::app::{Status, TaskStore};
 use chrono::{DateTime, Utc};
 use humantime::format_duration;
+use itertools::Itertools;
 use leptos::prelude::*;
 use leptos::{component, IntoView};
 
@@ -45,7 +46,8 @@ pub fn RunTasksComponent(store: TaskStore) -> impl IntoView {
                     } }
                 </div>
                 <div class="space-y-2">
-                    { move || store.result_signals.iter().map(|(task, maybe_result_signal)| {
+
+                    { move || store.result_signals.iter().sorted_by_key(|(t, _)| t.id()).map(|(task, maybe_result_signal)| {
                         match maybe_result_signal.get() {
                         None => {
                             (view! {
