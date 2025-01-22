@@ -390,12 +390,17 @@ impl TaskStore {
         let mut tasks_queue: VecDeque<&RunTaskData> = VecDeque::from(
             self.results
                 .keys()
-                // .filter(|t| {
-                //     match t {
-                //         RunTaskData::RunReal { input, part } => input.day != 9 && input.day != 12, // skip slow-running task while developing
-                //         RunTaskData::RunTestcase { .. } => true,
-                //     }
-                // })
+                .filter(|t| {
+                    // skip slow-running task in dev-build (take way too long)
+                    if cfg!(not(debug_assertions)) {
+                        true
+                    } else {
+                        match t {
+                            RunTaskData::RunReal { input, part } => input.day != 9 && input.day != 12,
+                            RunTaskData::RunTestcase { .. } => true,
+                        }
+                    }
+                })
                 .sorted_by_key(|t| t.id())
                 .collect_vec(),
         );
