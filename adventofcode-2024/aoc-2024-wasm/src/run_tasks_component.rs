@@ -1,9 +1,45 @@
-use crate::app::{Status, TaskStore};
+use crate::app::{AocDayInput, RunTaskData, Status, TaskStore};
+use aoc_2024_wasm::{Part, Solution};
 use chrono::{DateTime, Utc};
 use humantime::format_duration;
 use itertools::Itertools;
+use itertools::*;
+use leptos::logging::log;
 use leptos::prelude::*;
 use leptos::{component, IntoView};
+
+#[component]
+fn ResultRowRealTask(input: AocDayInput, #[prop(into)] part_result_signals: Vec<(Part, ReadSignal<Option<Solution>>)>) -> impl IntoView {
+    let day = input.day;
+
+    log!("rendering row for day {} with {} parts", input.day, part_result_signals.len());
+
+    view! {
+        <tr>
+            <td class="border border-gray-300 dark:border-gray-700 p-2">{format!("{day:02}")}</td>
+            <For
+                each=move || part_result_signals.clone()
+                key=|(part, _)| part.clone()
+                children=move |(_, signal)| {
+                            {move || match signal.get() {
+                                None => {
+                                    (view! {
+                                        <td class="border border-gray-300 dark:border-gray-700 text-right p-2 text-orange-400">"Pending"</td>
+                                        <td class="border border-gray-300 dark:border-gray-700 text-right p-2 text-orange-400">"Pending"</td>
+                                    }).into_any()
+
+                                },
+                                Some(result) =>
+                                    (view! {
+                                        <td class="border border-gray-300 dark:border-gray-700 text-right p-2">{result.result}</td>
+                                        <td class="border border-gray-300 dark:border-gray-700 text-right p-2">{format_duration(result.duration.to_std().unwrap()).to_string()}</td>
+                                    }).into_any()
+                            }}
+                }
+            />
+        </tr>
+    }
+}
 
 #[component]
 pub fn RunTasksComponent(store: TaskStore) -> impl IntoView {
@@ -46,27 +82,47 @@ pub fn RunTasksComponent(store: TaskStore) -> impl IntoView {
                     } }
                 </div>
                 <div class="space-y-2">
+                    <table class="table-auto border border-collapse border-gray-400 dark:border-gray-500">
+                        <thead>
+                          <tr>
+                            <th class="border border-gray-300 dark:border-gray-600 p-2">"Day"</th>
+                            <th class="border border-gray-300 dark:border-gray-600 p-2 text-right">"Part 1 Result"</th>
+                            <th class="border border-gray-300 dark:border-gray-600 p-2 text-right">"Part 1 Time"</th>
+                            <th class="border border-gray-300 dark:border-gray-600 p-2 text-right">"Part 2 Result"</th>
+                            <th class="border border-gray-300 dark:border-gray-600 p-2 text-right">"Part 2 Time"</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {
+                              move || {
+                                  // don't ask - borrow-checker made me do this
+                                  store
+                                    .result_signals
+                                    .iter()
+                                    .filter_map(|(t, signal)| match t {
+                                        RunTaskData::RunReal { task } => Some((task, signal)),
+                                        RunTaskData::RunTestcase { .. } => None,
+                                    })
+                                    .inspect(|t| {log!("before group: day {} part {:?}", t.0.input.day, t.0.part)})
+                                    .into_group_map_by(|(t, _)| t.input.clone())
+                                    .into_iter()
+                                    .inspect(|t| {log!("after group: day {} num signals: {}", t.0.day, t.1.len())})
+                                    .sorted_by_key(|(day_input, _)| day_input.day)
+                                    .map(|(day_input, data_for_day)| {
+                                        let day_signals =data_for_day.into_iter().map(|(task, signal)| (task.part.clone(), signal.clone())).collect_vec();
+                                        log!("got {} signals for day {}", day_signals.len(), day_input.day);
+                                        (
+                                            day_input,
+                                            day_signals,
+                                        )
+                                    })
+                                    .map(|(day_input, part_signals)| view!{ <ResultRowRealTask input={day_input} part_result_signals={part_signals} /> } )
+                                    .collect_view()
 
-                    { move || store.result_signals.iter().sorted_by_key(|(t, _)| t.id()).map(|(task, maybe_result_signal)| {
-                        match maybe_result_signal.get() {
-                        None => {
-                            (view! {
-                                <div class="p-2 bg-gray-800 rounded">
-                                    <div class="font-bold">{format!("{:?}", task)}</div>
-                                    <div class="text-gray-500">"Pending..."</div>
-                                </div>
-                            }).into_any()
-                            },
-                            Some(result) => {
-                                (view! {
-                                    <div class="p-2 bg-green-800 rounded">
-                                        <div class="font-bold">{format!("{:?}", task)}</div>
-                                        <div>{format!("{:?}", result)}</div>
-                                    </div>
-                                }).into_any()
-                            }
-                        }
-                    }).collect_view()}
+                               }
+                          }
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

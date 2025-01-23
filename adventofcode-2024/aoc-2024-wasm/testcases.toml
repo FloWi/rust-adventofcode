@@ -538,7 +538,7 @@ Prize: X=18641, Y=10279
 day = 14
 part = 1
 solution = "12"
-args = "IVec2::new(11, 7)"
+args = "11,7"
 input = '''
 p=0,4 v=3,-3
 p=6,3 v=-1,-3

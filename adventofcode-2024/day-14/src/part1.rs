@@ -75,7 +75,10 @@ pub fn process_parameterized(input: &str, game_field_dimensions: IVec2) -> miett
 
     //dbg!(&quadrant_counts);
 
-    let result = quadrant_counts.values().product::<usize>();
+    let result = quadrant_counts
+        .values()
+        .map(|count| *count as u64)
+        .product::<u64>();
 
     Ok(result.to_string())
 }

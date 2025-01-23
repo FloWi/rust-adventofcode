@@ -27,16 +27,16 @@ use rayon::prelude::*;
 use regex::Regex;
 use send_wrapper::SendWrapper;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::ops::Not;
 use std::time::Duration;
 use web_sys::File;
 
-#[derive(Default, Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
-struct AocDayInput {
-    day: u32,
-    input: String,
+#[derive(Default, Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Hash)]
+pub struct AocDayInput {
+    pub day: u32,
+    pub input: String,
 }
 
 #[derive(Default, Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
@@ -248,6 +248,14 @@ async fn read_file_content(file: &SendWrapper<File>) -> String {
     (async move { wasm_bindgen_futures::JsFuture::from(text_blob).await.unwrap().as_string().unwrap() }).await
 }
 
+fn parts_for_day(day: u32) -> Vec<Part> {
+    if day < 25 {
+        vec![Part1, Part2]
+    } else {
+        vec![Part1]
+    }
+}
+
 #[component]
 fn AocDay(aoc_input_files: Signal<AocInput>) -> impl IntoView {
     //let (real_inputs, _, _) = use_local_storage::<AocInput, codee::string::JsonSerdeCodec>("adventofcode-2024");
@@ -284,22 +292,16 @@ fn AocDay(aoc_input_files: Signal<AocInput>) -> impl IntoView {
                     .collect_view()
             });
 
-            let parts = if day < 25 {
-                vec![Part1, Part2]
-            } else {
-                vec![Part1]
-            };
-
             let real_input_divs = maybe_real_input.clone().map(|inp| {
-                parts
+                parts_for_day(day)
                     .into_iter()
                     .map(|part| {
-                        console_log(format!("calculating result for real input for day {day} part {part:?}. Input: {}", inp.input).as_str());
+                        log!("calculating result for real input for day {day} part {part:?}. Input: {}", inp.input);
                         let result = solve_day(day, part.clone(), inp.input.as_str(), None);
                         let std_duration = result.duration.to_std().unwrap();
                         let duration_pretty = format_duration(std_duration).to_string();
 
-                        console_log(format!("calculated result for real input for day {day} part {part:?}. Result: {result:?}").as_str());
+                        log!("calculated result for real input for day {day} part {part:?}. Result: {result:?}");
                         div()
                             .child(h3().child(format!("Real input {part:?}")))
                             .child([
@@ -329,18 +331,34 @@ fn AocDay(aoc_input_files: Signal<AocInput>) -> impl IntoView {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RealTask {
+    pub(crate) input: AocDayInput,
+    pub(crate) part: Part,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TestcaseTask {
+    testcase: Testcase,
+    id: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RunTaskData {
-    RunReal { input: AocDayInput, part: Part },
-    RunTestcase { testcase: Testcase, id: usize },
+    RunReal { task: RealTask },
+    RunTestcase { task: TestcaseTask },
 }
 
 impl RunTaskData {
     pub(crate) fn id(&self) -> String {
         match self {
-            RunTaskData::RunReal { input, part } => {
+            RunTaskData::RunReal {
+                task: RealTask { input, part },
+            } => {
                 format!("Day {:02} - Part {part:?} - real", input.day)
             }
-            RunTaskData::RunTestcase { testcase, id } => {
+            RunTaskData::RunTestcase {
+                task: TestcaseTask { testcase, id },
+            } => {
                 format!("Day {:02} - Part {:?} - testcase #{}", testcase.day, testcase.part, id)
             }
         }
@@ -395,8 +413,19 @@ impl TaskStore {
                     if cfg!(not(debug_assertions)) {
                         true
                     } else {
+                        let too_slow = HashSet::from([
+                            (6, Part2),
+                            (7, Part2),
+                            (9, Part1),
+                            (9, Part2),
+                            (12, Part1),
+                            (12, Part2),
+                            (22, Part1),
+                        ]);
                         match t {
-                            RunTaskData::RunReal { input, part } => input.day != 9 && input.day != 12,
+                            RunTaskData::RunReal {
+                                task: RealTask { input, part },
+                            } => !too_slow.contains(&(input.day, part.clone())),
                             RunTaskData::RunTestcase { .. } => true,
                         }
                     }
@@ -430,13 +459,16 @@ fn RunAllComponent(aoc_input_files: Signal<AocInput>) -> impl IntoView {
         .get_untracked()
         .days
         .iter()
-        .map(|d| RunTaskData::RunReal { input: d.clone(), part: Part1 })
-        .chain(
-            testcases_by_day
-                .get()
-                .iter()
-                .flat_map(|(_day, testcases)| testcases.iter().enumerate().map(|(idx, tc)| RunTaskData::RunTestcase { testcase: tc.clone(), id: idx })),
-        )
+        .flat_map(|d| {
+            parts_for_day(d.day).into_iter().map(|part| RunTaskData::RunReal {
+                task: RealTask { input: d.clone(), part },
+            })
+        })
+        // .chain(testcases_by_day.get().iter().flat_map(|(_day, testcases)| {
+        //     testcases.iter().enumerate().map(|(idx, tc)| RunTaskData::RunTestcase {
+        //         task: TestcaseTask { testcase: tc.clone(), id: idx },
+        //     })
+        // }))
         .sorted_by_key(|t| t.id())
         .collect_vec();
 
@@ -450,8 +482,12 @@ fn RunAllComponent(aoc_input_files: Signal<AocInput>) -> impl IntoView {
 async fn run_task(task: &RunTaskData) -> Solution {
     log!("running {}", task.id());
     let result = match task {
-        RunTaskData::RunReal { input, part } => solve_day(input.day, part.clone(), &input.input, None),
-        RunTaskData::RunTestcase { testcase, .. } => {
+        RunTaskData::RunReal {
+            task: RealTask { input, part },
+        } => solve_day(input.day, part.clone(), &input.input, None),
+        RunTaskData::RunTestcase {
+            task: TestcaseTask { testcase, .. },
+        } => {
             let part: Part = testcase.part.try_into().unwrap();
             solve_day(testcase.day, part, &testcase.input, testcase.args.clone())
         }

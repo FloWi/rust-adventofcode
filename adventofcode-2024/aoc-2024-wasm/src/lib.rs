@@ -2,8 +2,7 @@ pub mod testcases;
 
 use crate::testcases::{read_all_testcases, Testcase};
 use crate::Part::{Part1, Part2};
-use chrono::{Duration, TimeDelta, Utc};
-use leptos::attr::r#for;
+use chrono::{TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
@@ -17,7 +16,7 @@ pub fn init_panic_hook() {
     console_error_panic_hook::set_once();
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Part {
     Part1 = 1,
     Part2 = 2,
@@ -86,7 +85,10 @@ fn solve_day_internal(day: u32, part: Part, input: &str, maybe_args: Option<Stri
         (12, Part::Part2, _) => day_12::part2::process(input),
         (13, Part::Part1, _) => day_13::part1::process(input),
         (13, Part::Part2, _) => day_13::part2::process(input),
-        (14, Part::Part1, maybe_args) => day_14::part1::process_with_args(input, &maybe_args.unwrap_or("".to_string())),
+        (14, Part::Part1, maybe_args) => match maybe_args {
+            None => day_14::part1::process(input),
+            Some(args) => day_14::part1::process_with_args(input, &args),
+        },
         (14, Part::Part2, _) => day_14::part2::process(input),
         (15, Part::Part1, _) => day_15::part1::process(input),
         (15, Part::Part2, _) => day_15::part2::process(input),
@@ -95,11 +97,20 @@ fn solve_day_internal(day: u32, part: Part, input: &str, maybe_args: Option<Stri
         (17, Part::Part1, _) => day_17::part1::process(input),
         (17, Part::Part2, _) => day_17::part2::process(input),
         (18, Part::Part1, _) => day_18::part1::process(input),
-        (18, Part::Part2, maybe_args) => day_18::part2::process_with_args(input, &maybe_args.unwrap_or("".to_string())),
+        (18, Part::Part2, maybe_args) => match maybe_args {
+            None => day_18::part2::process(input),
+            Some(args) => day_18::part2::process_with_args(input, &args),
+        },
         (19, Part::Part1, _) => day_19::part1::process(input),
         (19, Part::Part2, _) => day_19::part2::process(input),
-        (20, Part::Part1, maybe_args) => day_20::part1::process_with_args(input, &maybe_args.unwrap_or("".to_string())),
-        (20, Part::Part2, maybe_args) => day_20::part2::process_with_args(input, &maybe_args.unwrap_or("".to_string())),
+        (20, Part::Part1, maybe_args) => match maybe_args {
+            None => day_20::part1::process(input),
+            Some(args) => day_20::part1::process_with_args(input, &args),
+        },
+        (20, Part::Part2, maybe_args) => match maybe_args {
+            None => day_20::part2::process(input),
+            Some(args) => day_20::part2::process_with_args(input, &args),
+        },
         (21, Part::Part1, _) => day_21::part1::process(input),
         (21, Part::Part2, _) => day_21::part2::process(input),
         (22, Part::Part1, _) => day_22::part1::process(input),
