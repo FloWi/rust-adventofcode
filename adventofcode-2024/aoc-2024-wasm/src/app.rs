@@ -65,34 +65,54 @@ pub fn App() -> impl IntoView {
     let (all_real_input_files, set_all_real_input_files, _) = use_local_storage::<AocInput, JsonSerdeCodec>("adventofcode-2024");
 
     view! {
-        <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico"/>
-       <div id="root">
-      // we wrap the whole app in a <Router/> to allow client-side navigation
-      // from our nav links below
-      <Router>
-        <main>
-          // <Routes/> both defines our routes and shows them on the page
-          <Routes fallback=|| "Not found.">
-            <ParentRoute
-              path=path!("adventofcode-2024")
-              view=AocDays // this component has an <Outlet/> for rendering the inner <AocDay> component
-            >
-              <Route path=path!("manage-inputs") view= move || view! { <RealInputManager read=all_real_input_files write=set_all_real_input_files /> } />
-              <Route path=path!("all-testcases") view= move || view! { <RunAllComponent aoc_input_files=all_real_input_files /> } />
-              <Route
-                path=path!("day/:day")
-                view= move || view! { <AocDay aoc_input_files=all_real_input_files/> }
-              />
-              // a fallback if the /:id segment is missing from the URL
-              <Route
-                path=path!("")
-                view=move || view! { <p class="day">"Select a day."</p> }
-              />
-            </ParentRoute>
-          </Routes>
-        </main>
-      </Router>
-    </div>
+        <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico" />
+        <div id="root">
+            // we wrap the whole app in a <Router/> to allow client-side navigation
+            // from our nav links below
+            <Router>
+                <main>
+                    // <Routes/> both defines our routes and shows them on the page
+                    <Routes fallback=|| "Not found.">
+                        <ParentRoute
+                            path=path!("adventofcode-2024")
+                            // this component has an <Outlet/> for rendering the inner <AocDay> component
+                            view=AocDays
+                        >
+                            <Route
+                                path=path!("manage-inputs")
+                                view=move || {
+                                    view! {
+                                        <RealInputManager
+                                            read=all_real_input_files
+                                            write=set_all_real_input_files
+                                        />
+                                    }
+                                }
+                            />
+                            <Route
+                                path=path!("all-testcases")
+                                view=move || {
+                                    view! {
+                                        <RunAllComponent aoc_input_files=all_real_input_files />
+                                    }
+                                }
+                            />
+                            <Route
+                                path=path!("day/:day")
+                                view=move || {
+                                    view! { <AocDay aoc_input_files=all_real_input_files /> }
+                                }
+                            />
+                            // a fallback if the /:id segment is missing from the URL
+                            <Route
+                                path=path!("")
+                                view=move || view! { <p class="day">"Select a day."</p> }
+                            />
+                        </ParentRoute>
+                    </Routes>
+                </main>
+            </Router>
+        </div>
     }
 }
 
@@ -174,11 +194,11 @@ fn RealInputManager(read: Signal<AocInput>, write: WriteSignal<AocInput>) -> imp
             .map(|file| {
                 view! {
                     <div class="w-200px bg-black-200/10 ma-2 pa-6">
-                                                    <p>Name: {file.name()}</p>
-                                                    <p>Size: {file.size()}</p>
-                                                    <p>Type: {file.type_()}</p>
-                                                    <p>Last modified: {file.last_modified()}</p>
-                                                </div>
+                        <p>Name: {file.name()}</p>
+                        <p>Size: {file.size()}</p>
+                        <p>Type: {file.type_()}</p>
+                        <p>Last modified: {file.last_modified()}</p>
+                    </div>
                 }
             })
             .collect_view()
@@ -202,16 +222,14 @@ fn RealInputManager(read: Signal<AocInput>, write: WriteSignal<AocInput>) -> imp
                     node_ref=drop_zone_el
                     class="flex flex-col w-full min-h-[200px] h-auto bg-gray-400/10 justify-center items-center pt-6"
                 >
-                    <div>is_over_drop_zone: <BooleanDisplay value=is_over_drop_zone/></div>
-                    <div>dropped: <BooleanDisplay value=dropped/></div>
+                    <div>is_over_drop_zone: <BooleanDisplay value=is_over_drop_zone /></div>
+                    <div>dropped: <BooleanDisplay value=dropped /></div>
                     <div class="flex flex-wrap justify-center items-center">
-                        Got {move || files.get().len()} files
+                        Got {move || files.get().len()}files
                     </div>
+                    <div class="flex flex-wrap justify-center items-center">{file_divs}</div>
                     <div class="flex flex-wrap justify-center items-center">
-                      {file_divs}
-                    </div>
-                    <div class="flex flex-wrap justify-center items-center">
-                      {move || store_files_button()}
+                        {move || store_files_button()}
                     </div>
                 </div>
             </div>
@@ -474,9 +492,7 @@ fn RunAllComponent(aoc_input_files: Signal<AocInput>) -> impl IntoView {
 
     let store: TaskStore = TaskStore::new(all_tasks);
 
-    view! {
-        <RunTasksComponent store={store} />
-    }
+    view! { <RunTasksComponent store=store /> }
 }
 
 async fn run_task(task: &RunTaskData) -> Solution {
@@ -516,7 +532,7 @@ fn AocDays() -> impl IntoView {
                 // using css file to style a-tag conditionally
                 view! {
                     <li>
-                      <A href=format!("day/{d}")>{label}</A>
+                        <A href=format!("day/{d}")>{label}</A>
                     </li>
                 }
             })
@@ -525,8 +541,12 @@ fn AocDays() -> impl IntoView {
 
     let other_links_html = view! {
         <ul>
-        <li><A href=format!("manage-inputs")>"manage inputs"</A></li>
-        <li><A href=format!("all-testcases")>"all testcases"</A></li>
+            <li>
+                <A href=format!("manage-inputs")>"manage inputs"</A>
+            </li>
+            <li>
+                <A href=format!("all-testcases")>"all testcases"</A>
+            </li>
         </ul>
     };
 

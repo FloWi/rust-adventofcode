@@ -53,4 +53,8 @@ copy-to-hetzner:
 
     scp -r aoc-2024-wasm/dist/* hetzner-flwi:/var/www/spa.flwi.de/files/adventofcode-2024/
 
-    echo "✓ Published to SPA directory"
+    echo "✓ Published to SPA directory. https://spa.flwi.de/adventofcode-2024/"
+
+
+leptosfmt:
+    leptosfmt aoc-2024-wasm
