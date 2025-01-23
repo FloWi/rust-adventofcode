@@ -81,6 +81,7 @@ pub fn RunTasksComponent(store: TaskStore) -> impl IntoView {
                         }
                     } }
                 </div>
+                <p>"For reference: Took ~9.5s on macbook pro m1 max 64GB."</p>
                 <div class="space-y-2">
                     <table class="table-auto border border-collapse border-gray-400 dark:border-gray-500">
                         <thead>
