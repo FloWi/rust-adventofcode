@@ -3,5 +3,5 @@
 @tailwind utilities;
 
 a[aria-current] {
-    @apply text-sky-800
+    @apply text-blue-800 dark:text-blue-300
 }

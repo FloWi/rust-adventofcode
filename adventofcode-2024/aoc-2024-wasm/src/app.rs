@@ -62,7 +62,9 @@ pub fn App() -> impl IntoView {
     let (testcases_by_day, _set_testcases_by_day) = signal(testcases_by_day);
 
     provide_context(testcases_by_day);
-    let (all_real_input_files, set_all_real_input_files, _) = use_local_storage::<AocInput, JsonSerdeCodec>("adventofcode-2024");
+    let local_storage_key = "adventofcode-2024".to_string();
+    let (all_real_input_files, set_all_real_input_files, delete_all_real_input_files) =
+        use_local_storage::<AocInput, JsonSerdeCodec>(local_storage_key.clone());
 
     view! {
         <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico" />
@@ -82,15 +84,13 @@ pub fn App() -> impl IntoView {
                                 path=path!("manage-inputs")
                                 view=move || {
                                     view! {
-                                        <RealInputManager
-                                            read=all_real_input_files
-                                            write=set_all_real_input_files
+                                        <RealInputManager local_storage_key={local_storage_key.clone()}
                                         />
                                     }
                                 }
                             />
                             <Route
-                                path=path!("all-testcases")
+                                path=path!("all-days-performance")
                                 view=move || {
                                     view! {
                                         <RunAllComponent aoc_input_files=all_real_input_files />
@@ -177,7 +177,9 @@ fn styled_button() -> HtmlElement<Button, (Class<&'static str>,), ()> {
 }
 
 #[component]
-fn RealInputManager(read: Signal<AocInput>, write: WriteSignal<AocInput>) -> impl IntoView {
+fn RealInputManager(local_storage_key: String) -> impl IntoView {
+    let (read, write, delete_fn) = use_local_storage::<AocInput, JsonSerdeCodec>(local_storage_key.clone());
+
     let (dropped, set_dropped) = signal(false);
 
     let drop_zone_el = NodeRef::<Div>::new();
@@ -193,11 +195,11 @@ fn RealInputManager(read: Signal<AocInput>, write: WriteSignal<AocInput>) -> imp
             .iter()
             .map(|file| {
                 view! {
-                    <div class="w-200px bg-black-200/10 ma-2 pa-6">
-                        <p>Name: {file.name()}</p>
-                        <p>Size: {file.size()}</p>
-                        <p>Type: {file.type_()}</p>
-                        <p>Last modified: {file.last_modified()}</p>
+                    <div class="w-200px bg-black-200/10 ma-2 pa-6 border">
+                        <p><span>"Name:"</span><span>{file.name()}</span></p>
+                        <p><span>"Size:"</span><span>{file.size()}</span></p>
+                        <p><span>"Type:"</span><span>{file.type_()}</span></p>
+                        <p><span>"Last modified:"</span><span>{file.last_modified()}</span></p>
                     </div>
                 }
             })
@@ -216,8 +218,10 @@ fn RealInputManager(read: Signal<AocInput>, write: WriteSignal<AocInput>) -> imp
     view! {
         <div class="flex">
             <div class="w-full h-auto relative">
-                <p>Drop files into dropZone</p>
-                <div class="bg-green w-16 h16">Drop me</div>
+                <p>"Drop files into dropZone. The files must be txt files and have the day as a filename."</p>
+                <p>{format!("The files will be stored in localstorage under the key '{local_storage_key}' and won't be uploaded. ")}</p>
+                <p>"e.g. day-01.txt, day-02.txt"</p>
+                <div class="bg-green w-16 h16"></div>
                 <div
                     node_ref=drop_zone_el
                     class="flex flex-col w-full min-h-[200px] h-auto bg-gray-400/10 justify-center items-center pt-6"
@@ -225,12 +229,13 @@ fn RealInputManager(read: Signal<AocInput>, write: WriteSignal<AocInput>) -> imp
                     <div>is_over_drop_zone: <BooleanDisplay value=is_over_drop_zone /></div>
                     <div>dropped: <BooleanDisplay value=dropped /></div>
                     <div class="flex flex-wrap justify-center items-center">
-                        Got {move || files.get().len()}files
+                        <p><span>"Got "</span>{move || files.get().len()}<span>" files"</span></p>
                     </div>
-                    <div class="flex flex-wrap justify-center items-center">{file_divs}</div>
+                    <div class="flex flex-wrap justify-center items-center gap-4">{file_divs}</div>
                     <div class="flex flex-wrap justify-center items-center">
                         {move || store_files_button()}
                     </div>
+
                 </div>
             </div>
         </div>
@@ -238,6 +243,7 @@ fn RealInputManager(read: Signal<AocInput>, write: WriteSignal<AocInput>) -> imp
 }
 
 async fn store_files_in_localstorage(files: Vec<SendWrapper<File>>, set_all_real_input_files: WriteSignal<AocInput>) {
+    log!("Storing {} files in localstorage", files.len());
     let files_with_contents = futures::future::join_all(files.iter().map(|file| read_file_content(file).map(|c| (file.name(), c)))).await;
 
     let content = files_with_contents
@@ -542,20 +548,18 @@ fn AocDays() -> impl IntoView {
     let other_links_html = view! {
         <ul>
             <li>
-                <A href=format!("manage-inputs")>"manage inputs"</A>
+                <A href="manage-inputs">"manage inputs"</A>
             </li>
             <li>
-                <A href=format!("all-testcases")>"all testcases"</A>
+                <A href="all-days-performance">"performance all days"</A>
             </li>
         </ul>
     };
 
     let nav_bar = div().class("flex flex-col min-w-fit gap-4 divide-y").child(days_html).child(other_links_html);
 
-    div().class("bg-gradient-to-tl from-blue-800 to-blue-500 text-white font-mono flex flex-col min-h-screen").child((
+    div().class("bg-gradient-to-tl from-blue-900 to-blue-600 text-white font-mono flex flex-col min-h-screen").child((
         title().child("Advent Of Code 2024"),
-        main().child(
-            div().class("bg-gradient-to-tl from-blue-800 to-blue-500 text-white font-mono flex flex-row min-w-screen gap-8 p-8").child((nav_bar, Outlet())),
-        ),
+        main().child(div().class("text-white font-mono flex flex-row min-w-screen gap-8 p-8").child((nav_bar, Outlet()))),
     ))
 }
