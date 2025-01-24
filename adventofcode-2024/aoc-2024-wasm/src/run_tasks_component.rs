@@ -21,14 +21,20 @@ pub fn RunTasksComponent(store: TaskStore) -> impl IntoView {
 
     if store.result_signals.is_empty() {
         (view! {
-        <div class="p-4">
-            <h1 class="text-2xl font-bold mb-4">"Performance Test Of All Days"</h1>
-            <p>
-              <span>"The AoC authors asked us to not share the input files publicly. Please provide your own files for storing them in localstorage. "</span>
-              <A href="/adventofcode-2024/manage-inputs"><span class="font-medium text-blue-800 underline dark:text-blue-300 hover:no-underline">"Manage inputs here"</span></A>
-            </p>
-        </div>
-         })
+            <div class="p-4">
+                <h1 class="text-2xl font-bold mb-4">"Performance Test Of All Days"</h1>
+                <p>
+                    <span>
+                        "The AoC authors asked us to not share the input files publicly. Please provide your own files for storing them in localstorage. "
+                    </span>
+                    <A href="/adventofcode-2024/manage-inputs">
+                        <span class="font-medium text-blue-800 underline dark:text-blue-300 hover:no-underline">
+                            "Manage inputs here"
+                        </span>
+                    </A>
+                </p>
+            </div>
+        })
         .into_any()
     } else {
         (view! {

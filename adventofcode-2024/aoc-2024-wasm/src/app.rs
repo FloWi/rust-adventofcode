@@ -12,6 +12,7 @@ use leptos::leptos_dom::logging::console_log;
 use leptos::logging::log;
 use leptos::prelude::*;
 use leptos::tachys::html::class::Class;
+use leptos::tachys::html::event;
 use leptos::task::spawn_local;
 use leptos_meta::*;
 use leptos_router::components::{Outlet, ParentRoute};
@@ -84,8 +85,8 @@ pub fn App() -> impl IntoView {
                                 path=path!("manage-inputs")
                                 view=move || {
                                     view! {
-                                        <RealInputManager local_storage_key={local_storage_key.clone()}
-                                        />
+                                        <RealInputManager local_storage_key=local_storage_key
+                                            .clone() />
                                     }
                                 }
                             />
@@ -196,30 +197,47 @@ fn RealInputManager(local_storage_key: String) -> impl IntoView {
             .map(|file| {
                 view! {
                     <div class="w-200px bg-black-200/10 ma-2 pa-6 border">
-                        <p><span>"Name:"</span><span>{file.name()}</span></p>
-                        <p><span>"Size:"</span><span>{file.size()}</span></p>
-                        <p><span>"Type:"</span><span>{file.type_()}</span></p>
-                        <p><span>"Last modified:"</span><span>{file.last_modified()}</span></p>
+                        <p>
+                            <span>"Name:"</span>
+                            <span>{file.name()}</span>
+                        </p>
+                        <p>
+                            <span>"Size:"</span>
+                            <span>{file.size()}</span>
+                        </p>
+                        <p>
+                            <span>"Type:"</span>
+                            <span>{file.type_()}</span>
+                        </p>
+                        <p>
+                            <span>"Last modified:"</span>
+                            <span>{file.last_modified()}</span>
+                        </p>
                     </div>
                 }
             })
             .collect_view()
     };
 
-    let store_files_button = move || {
+    let store_files_button = || {
         //
-        files
-            .get()
-            .is_empty()
-            .not()
-            .then_some(styled_button().child("Store files in localstorage").onclick(move || spawn_local(store_files_in_localstorage(files.get(), write))))
+    };
+
+    let delete_files_button = || {
+        //
     };
 
     view! {
         <div class="flex">
             <div class="w-full h-auto relative">
-                <p>"Drop files into dropZone. The files must be txt files and have the day as a filename."</p>
-                <p>{format!("The files will be stored in localstorage under the key '{local_storage_key}' and won't be uploaded. ")}</p>
+                <p>
+                    "Drop files into dropZone. The files must be txt files and have the day as a filename."
+                </p>
+                <p>
+                    {format!(
+                        "The files will be stored in localstorage under the key '{local_storage_key}' and won't be uploaded. ",
+                    )}
+                </p>
                 <p>"e.g. day-01.txt, day-02.txt"</p>
                 <div class="bg-green w-16 h16"></div>
                 <div
@@ -229,11 +247,44 @@ fn RealInputManager(local_storage_key: String) -> impl IntoView {
                     <div>is_over_drop_zone: <BooleanDisplay value=is_over_drop_zone /></div>
                     <div>dropped: <BooleanDisplay value=dropped /></div>
                     <div class="flex flex-wrap justify-center items-center">
-                        <p><span>"Got "</span>{move || files.get().len()}<span>" files"</span></p>
+                        <p>
+                            <span>"Got "</span>
+                            {move || files.get().len()}
+                            <span>" files"</span>
+                        </p>
                     </div>
                     <div class="flex flex-wrap justify-center items-center gap-4">{file_divs}</div>
                     <div class="flex flex-wrap justify-center items-center">
-                        {move || store_files_button()}
+                        {move || {
+                            files
+                                .get()
+                                .is_empty()
+                                .not()
+                                .then_some(
+                                    styled_button()
+                                        .child("Store files in localstorage")
+                                        .on(
+                                            event::click,
+                                            move |_| spawn_local(
+                                                store_files_in_localstorage(files.get(), write),
+                                            ),
+                                        ),
+                                )
+                        }}
+                    </div>
+                    <div class="flex flex-wrap justify-center items-center">
+                        {move || {
+                            let delete_fn_cloned = delete_fn.clone();
+                            files
+                                .get()
+                                .is_empty()
+                                .then_some(
+                                    styled_button()
+                                        .child("Delete files from localstorage")
+                                        .on(event::click, move |_| delete_fn_cloned()),
+                                )
+                        }}
+
                     </div>
 
                 </div>
