@@ -1,4 +1,5 @@
 mod app;
+pub mod components;
 mod run_tasks_component;
 
 use app::*;

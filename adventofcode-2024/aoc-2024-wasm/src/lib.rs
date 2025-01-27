@@ -3,7 +3,6 @@ pub mod testcases;
 use crate::testcases::{read_all_testcases, Testcase};
 use crate::Part::{Part1, Part2};
 use chrono::{TimeDelta, Utc};
-use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
 pub struct Solution {

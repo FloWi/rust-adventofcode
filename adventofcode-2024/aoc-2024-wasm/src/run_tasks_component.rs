@@ -1,4 +1,5 @@
-use crate::app::{AocDayInput, RunTaskData, Status, TaskStore};
+use crate::app::{RunTaskData, Status, TaskStore};
+use crate::components::AocDayInput;
 use aoc_2024_wasm::{Part, Solution};
 use chrono::{DateTime, Utc};
 use humantime::format_duration;
@@ -10,7 +11,7 @@ use leptos::{component, IntoView};
 use leptos_router::components::A;
 
 #[component]
-pub fn RunTasksComponent(store: TaskStore) -> impl IntoView {
+pub fn RunTasks(store: TaskStore) -> impl IntoView {
     let store_clone = store.clone();
     let num_tasks = store.result_signals.len();
 

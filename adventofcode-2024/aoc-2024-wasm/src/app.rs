@@ -1,17 +1,15 @@
-use crate::run_tasks_component::RunTasksComponent;
+use crate::components::{parse_day_from_str, styled_button, AocDayInput, AocInput, OwnInputManager};
+use crate::run_tasks_component::RunTasks;
 use aoc_2024_wasm::testcases::Testcase;
 use aoc_2024_wasm::Part::{Part1, Part2};
 use aoc_2024_wasm::{solve_day, Part, Solution};
 use chrono::{DateTime, Local, Utc};
 use codee::string::JsonSerdeCodec;
-use futures::FutureExt;
 use humantime::format_duration;
 use itertools::Itertools;
-use leptos::html::{button, div, h2, h3, main, p, span, textarea, title, ul, Button, Div, HtmlElement};
-use leptos::leptos_dom::logging::console_log;
-use leptos::logging::log;
+use leptos::html::{div, h2, h3, p, span, textarea, ul};
+use leptos::logging::{error, log};
 use leptos::prelude::*;
-use leptos::tachys::html::class::Class;
 use leptos::tachys::html::event;
 use leptos::task::spawn_local;
 use leptos_meta::*;
@@ -22,9 +20,10 @@ use leptos_router::{
     path,
 };
 use leptos_use::docs::BooleanDisplay;
+
+use leptos::wasm_bindgen::JsValue;
 use leptos_use::storage::use_local_storage;
 use leptos_use::{use_drop_zone_with_options, UseDropZoneOptions, UseDropZoneReturn};
-use rayon::prelude::*;
 use regex::Regex;
 use send_wrapper::SendWrapper;
 use serde::{Deserialize, Serialize};
@@ -32,18 +31,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::ops::Not;
 use std::time::Duration;
+use wasm_bindgen_futures::JsFuture;
 use web_sys::File;
-
-#[derive(Default, Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Hash)]
-pub struct AocDayInput {
-    pub day: u32,
-    pub input: String,
-}
-
-#[derive(Default, Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
-struct AocInput {
-    days: Vec<AocDayInput>,
-}
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -64,8 +53,7 @@ pub fn App() -> impl IntoView {
 
     provide_context(testcases_by_day);
     let local_storage_key = "adventofcode-2024".to_string();
-    let (all_real_input_files, set_all_real_input_files, delete_all_real_input_files) =
-        use_local_storage::<AocInput, JsonSerdeCodec>(local_storage_key.clone());
+    let (all_real_input_files, _, _) = use_local_storage::<AocInput, JsonSerdeCodec>(local_storage_key.clone());
 
     view! {
         <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico" />
@@ -78,13 +66,13 @@ pub fn App() -> impl IntoView {
                         <ParentRoute
                             path=path!("adventofcode-2024")
                             // this component has an <Outlet/> for rendering the inner <AocDay> component
-                            view=AocDays
+                            view=Main
                         >
                             <Route
                                 path=path!("manage-inputs")
                                 view=move || {
                                     view! {
-                                        <RealInputManager local_storage_key=local_storage_key
+                                        <OwnInputManager local_storage_key=local_storage_key
                                             .clone() />
                                     }
                                 }
@@ -115,13 +103,19 @@ pub fn App() -> impl IntoView {
     }
 }
 
-fn write_to_clipboard(text: &str) {
+async fn write_to_clipboard(text: String) -> () {
     let maybe_clipboard = web_sys::window().map(|w| w.navigator().clipboard());
     match maybe_clipboard {
         Some(cp) => {
-            cp.write_text(text); //TODO: This is fire-and-forget - figure out how to deal with Promises in rust-world
+            match JsFuture::from(cp.write_text(text.as_str())).await.map_err(|err| format!("Error writing to clipboard: {:?}", err)) {
+                Ok(_) => {}
+                Err(_) => {
+                    error!("Can't write to clipboard")
+                }
+            }
+            ()
         }
-        None => console_log("Can't write to clipboard"),
+        None => error!("Can't write to clipboard"),
     }
 }
 
@@ -161,7 +155,7 @@ fn AocTestcase(testcase: Testcase) -> impl IntoView {
         //testcase.args.map(|args| p().child(span().class("font-bold").child("Custom Args: ")).child(args)),
         testcase.args.map(|arg| p().child(span().class("font-bold").child("Custom Args: ")).child(span().child(arg))),
         p().class("font-bold mt-4").child(span().child("Testdata:")),
-        styled_button().on(leptos::ev::click, move |_| write_to_clipboard(testcase_input.as_str())).child("Copy"),
+        styled_button().on(leptos::ev::click, move |_| spawn_local(write_to_clipboard(testcase_input.clone()))).child("Copy"),
         textarea()
             .readonly(true)
             .class("w-full overflow-y-auto overflow-x-auto whitespace-pre text-inherit bg-inherit")
@@ -169,136 +163,6 @@ fn AocTestcase(testcase: Testcase) -> impl IntoView {
             .rows(20)
             .cols(40),
     ))
-}
-
-fn styled_button() -> HtmlElement<Button, (Class<&'static str>,), ()> {
-    button().class("inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3")
-}
-
-#[component]
-fn RealInputManager(local_storage_key: String) -> impl IntoView {
-    let (read, write, delete_fn) = use_local_storage::<AocInput, JsonSerdeCodec>(local_storage_key.clone());
-
-    let (dropped, set_dropped) = signal(false);
-
-    let drop_zone_el = NodeRef::<Div>::new();
-
-    let UseDropZoneReturn { is_over_drop_zone, files } = use_drop_zone_with_options(
-        drop_zone_el,
-        UseDropZoneOptions::default().on_drop(move |_| set_dropped.set(true)).on_enter(move |_| set_dropped.set(false)),
-    );
-
-    let file_divs = move || {
-        files
-            .get()
-            .iter()
-            .map(|file| {
-                view! {
-                    <div class="w-200px bg-black-200/10 ma-2 pa-6 border">
-                        <p>
-                            <span>"Name:"</span>
-                            <span>{file.name()}</span>
-                        </p>
-                        <p>
-                            <span>"Size:"</span>
-                            <span>{file.size()}</span>
-                        </p>
-                        <p>
-                            <span>"Type:"</span>
-                            <span>{file.type_()}</span>
-                        </p>
-                        <p>
-                            <span>"Last modified:"</span>
-                            <span>{file.last_modified()}</span>
-                        </p>
-                    </div>
-                }
-            })
-            .collect_view()
-    };
-
-    let store_files_button = move || {
-        files.get().is_empty().not().then_some(
-            styled_button().child("Store files in localstorage").on(event::click, move |_| spawn_local(store_files_in_localstorage(files.get(), write))),
-        )
-    };
-
-    let delete_files_button = move || {
-        let delete_fn_cloned = delete_fn.clone();
-        files.get().is_empty().then_some(styled_button().child("Delete files from localstorage").on(event::click, move |_| delete_fn_cloned()))
-    };
-
-    view! {
-        <div class="flex">
-            <div class="w-full h-auto relative">
-                <p>
-                    "Drop files into dropZone. The files must be txt files and have the day as a filename (any \\d+ in there will do)."
-                </p>
-                <p>
-                    {format!(
-                        "The files will be stored in localstorage under the key '{local_storage_key}' and won't be uploaded. ",
-                    )}
-                </p>
-                <p>"e.g. day-01.txt, day-02.txt"</p>
-                <div class="bg-green w-16 h16"></div>
-                <div
-                    node_ref=drop_zone_el
-                    class="flex flex-col w-full min-h-[200px] h-auto bg-gray-400/10 justify-center items-center pt-6"
-                >
-                    <div>is_over_drop_zone: <BooleanDisplay value=is_over_drop_zone /></div>
-                    <div>dropped: <BooleanDisplay value=dropped /></div>
-                    <div class="flex flex-wrap justify-center items-center">
-                        <p>
-                            <span>"Got "</span>
-                            {move || files.get().len()}
-                            <span>" files"</span>
-                        </p>
-                    </div>
-                    <div class="flex flex-wrap justify-center items-center gap-4">{file_divs}</div>
-                    <div class="flex flex-wrap justify-center items-center">
-                        {move || store_files_button() }
-                    </div>
-                    <div class="flex flex-wrap justify-center items-center">
-                        {move ||
-                            delete_files_button()
-                        }
-
-                    </div>
-
-                </div>
-            </div>
-        </div>
-    }
-}
-
-async fn store_files_in_localstorage(files: Vec<SendWrapper<File>>, set_all_real_input_files: WriteSignal<AocInput>) {
-    log!("Storing {} files in localstorage", files.len());
-    let files_with_contents = futures::future::join_all(files.iter().map(|file| read_file_content(file).map(|c| (file.name(), c)))).await;
-
-    let content = files_with_contents
-        .iter()
-        .cloned()
-        .map(|(name, content)| {
-            let day: u32 = parse_day_from_str(&name).unwrap();
-            AocDayInput { day, input: content }
-        })
-        .collect_vec();
-
-    console_log(format!("content for all {} days", files.len()).as_str());
-    let serialized = serde_json::to_string_pretty(&content).unwrap();
-    console_log(serialized.as_str());
-
-    set_all_real_input_files.set(AocInput { days: content });
-}
-
-fn parse_day_from_str(filename: &str) -> Option<u32> {
-    let re = Regex::new(r"\d+").unwrap();
-    re.find(filename)?.as_str().parse().ok()
-}
-
-async fn read_file_content(file: &SendWrapper<File>) -> String {
-    let text_blob = file.text();
-    (async move { wasm_bindgen_futures::JsFuture::from(text_blob).await.unwrap().as_string().unwrap() }).await
 }
 
 fn parts_for_day(day: u32) -> Vec<Part> {
@@ -507,7 +371,7 @@ impl TaskStore {
 
 #[component]
 fn RunAllComponent(aoc_input_files: Signal<AocInput>) -> impl IntoView {
-    let testcases_by_day = use_context::<ReadSignal<Vec<(u32, Vec<Testcase>)>>>().expect("to have found the testcases");
+    // let testcases_by_day = use_context::<ReadSignal<Vec<(u32, Vec<Testcase>)>>>().expect("to have found the testcases");
     let all_tasks: Vec<RunTaskData> = aoc_input_files
         .get_untracked()
         .days
@@ -527,7 +391,7 @@ fn RunAllComponent(aoc_input_files: Signal<AocInput>) -> impl IntoView {
 
     let store: TaskStore = TaskStore::new(all_tasks);
 
-    view! { <RunTasksComponent store=store /> }
+    view! { <RunTasks store=store /> }
 }
 
 async fn run_task(task: &RunTaskData) -> Solution {
@@ -549,7 +413,7 @@ async fn run_task(task: &RunTaskData) -> Solution {
 }
 
 #[component]
-fn AocDays() -> impl IntoView {
+fn Main() -> impl IntoView {
     let testcases_by_day = use_context::<ReadSignal<Vec<(u32, Vec<Testcase>)>>>().expect("to have found the testcases");
 
     let days = testcases_by_day.read().iter().cloned().map(|(day, _)| day).collect_vec();
