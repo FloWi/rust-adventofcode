@@ -4,7 +4,6 @@ use aoc_2024_wasm::{Part, Solution};
 use chrono::{DateTime, Utc};
 use humantime::format_duration;
 use itertools::Itertools;
-use itertools::*;
 use leptos::logging::log;
 use leptos::prelude::*;
 use leptos::{component, IntoView};
@@ -132,7 +131,7 @@ pub fn RunTasks(store: TaskStore) -> impl IntoView {
                                         .map(|(day_input, data_for_day)| {
                                             let day_signals = data_for_day
                                                 .into_iter()
-                                                .map(|(task, signal)| (task.part.clone(), signal.clone()))
+                                                .map(|(task, signal)| (task.part.clone(), *signal))
                                                 .collect_vec();
                                             log!(
                                                 "got {} signals for day {}", day_signals.len(), day_input.day

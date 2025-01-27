@@ -3,14 +3,13 @@ use crate::run_tasks_component::RunTasks;
 use aoc_2024_wasm::testcases::Testcase;
 use aoc_2024_wasm::Part::{Part1, Part2};
 use aoc_2024_wasm::{solve_day, Part, Solution};
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Utc};
 use codee::string::JsonSerdeCodec;
 use humantime::format_duration;
 use itertools::Itertools;
 use leptos::html::{div, h2, h3, p, span, textarea, ul};
 use leptos::logging::{error, log};
 use leptos::prelude::*;
-use leptos::tachys::html::event;
 use leptos::task::spawn_local;
 use leptos_meta::*;
 use leptos_router::components::{Outlet, ParentRoute};
@@ -19,20 +18,12 @@ use leptos_router::{
     components::{Route, Router, Routes, A},
     path,
 };
-use leptos_use::docs::BooleanDisplay;
 
-use leptos::wasm_bindgen::JsValue;
 use leptos_use::storage::use_local_storage;
-use leptos_use::{use_drop_zone_with_options, UseDropZoneOptions, UseDropZoneReturn};
-use regex::Regex;
-use send_wrapper::SendWrapper;
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher};
-use std::ops::Not;
 use std::time::Duration;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::File;
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -103,7 +94,7 @@ pub fn App() -> impl IntoView {
     }
 }
 
-async fn write_to_clipboard(text: String) -> () {
+async fn write_to_clipboard(text: String) {
     let maybe_clipboard = web_sys::window().map(|w| w.navigator().clipboard());
     match maybe_clipboard {
         Some(cp) => {
@@ -113,7 +104,7 @@ async fn write_to_clipboard(text: String) -> () {
                     error!("Can't write to clipboard")
                 }
             }
-            ()
+            
         }
         None => error!("Can't write to clipboard"),
     }
@@ -182,14 +173,14 @@ fn AocDay(aoc_input_files: Signal<AocInput>) -> impl IntoView {
     let maybe_day = move || params.read().get("day");
     let maybe_day_and_inputs = move || {
         maybe_day().map(|day_str| {
-            let maybe_real_input = aoc_input_files.get().days.iter().find(|d| d.day.to_string() == day_str).clone().cloned();
+            let maybe_real_input = aoc_input_files.get().days.iter().find(|d| d.day.to_string() == day_str).cloned();
             (day_str, maybe_real_input)
         })
     };
 
     move || {
         maybe_day_and_inputs().map(|(day_str, maybe_real_input)| {
-            let maybe_testcases_for_day = testcases_by_day.read().iter().cloned().find(|(d, _)| d.to_string() == day_str);
+            let maybe_testcases_for_day = testcases_by_day.read().iter().find(|&(d, _)| d.to_string() == day_str).cloned();
             let day = parse_day_from_str(&day_str).unwrap();
 
             //FIXME: this doesn't refresh when I navigate around by clicking links

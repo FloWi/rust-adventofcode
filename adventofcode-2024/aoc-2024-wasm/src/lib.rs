@@ -34,7 +34,7 @@ impl TryFrom<u32> for Part {
 }
 
 pub fn solve_day(day: u32, part: Part, input: &str, maybe_args: Option<String>) -> Solution {
-    use chrono;
+    
     let start = Utc::now();
     let result = solve_day_internal(day, part, input, maybe_args);
     let end = Utc::now();
@@ -50,8 +50,8 @@ pub fn solve_day(day: u32, part: Part, input: &str, maybe_args: Option<String>) 
 }
 
 pub fn get_testcases() -> Vec<Testcase> {
-    let testcases = read_all_testcases();
-    testcases
+    
+    read_all_testcases()
 }
 
 fn solve_day_internal(day: u32, part: Part, input: &str, maybe_args: Option<String>) -> miette::Result<String> {

@@ -14,6 +14,6 @@ pub fn read_all_testcases() -> Vec<Testcase> {
     let toml_str = include_str!("../testcases.toml");
     let testcases: HashMap<String, Vec<Testcase>> = toml::from_str(toml_str).unwrap();
 
-    let testcases: Vec<Testcase> = testcases.get("testcases").unwrap().iter().cloned().collect();
+    let testcases: Vec<Testcase> = testcases.get("testcases").unwrap().to_vec();
     testcases
 }
