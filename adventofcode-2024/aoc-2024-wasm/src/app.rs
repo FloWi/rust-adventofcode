@@ -69,11 +69,10 @@ pub fn App() -> impl IntoView {
 
     view! {
         <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico" />
-        <div id="root">
+        <div id="root" class="dark">
             // we wrap the whole app in a <Router/> to allow client-side navigation
             // from our nav links below
             <Router>
-                <main>
                     // <Routes/> both defines our routes and shows them on the page
                     <Routes fallback=|| "Not found.">
                         <ParentRoute
@@ -111,7 +110,6 @@ pub fn App() -> impl IntoView {
                             />
                         </ParentRoute>
                     </Routes>
-                </main>
             </Router>
         </div>
     }
@@ -219,19 +217,22 @@ fn RealInputManager(local_storage_key: String) -> impl IntoView {
             .collect_view()
     };
 
-    let store_files_button = || {
-        //
+    let store_files_button = move || {
+        files.get().is_empty().not().then_some(
+            styled_button().child("Store files in localstorage").on(event::click, move |_| spawn_local(store_files_in_localstorage(files.get(), write))),
+        )
     };
 
-    let delete_files_button = || {
-        //
+    let delete_files_button = move || {
+        let delete_fn_cloned = delete_fn.clone();
+        files.get().is_empty().then_some(styled_button().child("Delete files from localstorage").on(event::click, move |_| delete_fn_cloned()))
     };
 
     view! {
         <div class="flex">
             <div class="w-full h-auto relative">
                 <p>
-                    "Drop files into dropZone. The files must be txt files and have the day as a filename."
+                    "Drop files into dropZone. The files must be txt files and have the day as a filename (any \\d+ in there will do)."
                 </p>
                 <p>
                     {format!(
@@ -255,35 +256,12 @@ fn RealInputManager(local_storage_key: String) -> impl IntoView {
                     </div>
                     <div class="flex flex-wrap justify-center items-center gap-4">{file_divs}</div>
                     <div class="flex flex-wrap justify-center items-center">
-                        {move || {
-                            files
-                                .get()
-                                .is_empty()
-                                .not()
-                                .then_some(
-                                    styled_button()
-                                        .child("Store files in localstorage")
-                                        .on(
-                                            event::click,
-                                            move |_| spawn_local(
-                                                store_files_in_localstorage(files.get(), write),
-                                            ),
-                                        ),
-                                )
-                        }}
+                        {move || store_files_button() }
                     </div>
                     <div class="flex flex-wrap justify-center items-center">
-                        {move || {
-                            let delete_fn_cloned = delete_fn.clone();
-                            files
-                                .get()
-                                .is_empty()
-                                .then_some(
-                                    styled_button()
-                                        .child("Delete files from localstorage")
-                                        .on(event::click, move |_| delete_fn_cloned()),
-                                )
-                        }}
+                        {move ||
+                            delete_files_button()
+                        }
 
                     </div>
 
@@ -607,10 +585,25 @@ fn AocDays() -> impl IntoView {
         </ul>
     };
 
-    let nav_bar = div().class("flex flex-col min-w-fit gap-4 divide-y").child(days_html).child(other_links_html);
+    // let nav_bar = div().class("flex flex-col min-w-fit gap-4 divide-y").child(days_html).child(other_links_html);
 
-    div().class("bg-gradient-to-tl from-blue-900 to-blue-600 text-white font-mono flex flex-col min-h-screen").child((
-        title().child("Advent Of Code 2024"),
-        main().child(div().class("text-white font-mono flex flex-row min-w-screen gap-8 p-8").child((nav_bar, Outlet()))),
-    ))
+    view! {
+        <div class="desktop-page bg-background shadow-md p-4">
+                <title>"Advent Of Code 2024"</title>
+                <div class="header"><h1>"Advent Of Code 2024"</h1></div>
+                <div class="sub-header"></div>
+                <div class="left">
+                    {days_html}
+                    {other_links_html}
+                </div>
+                <div class="content">
+                    <Outlet />
+                </div>
+        </div>
+    }
+
+    // div().class("bg-gradient-to-tl from-blue-900 to-blue-600 text-white font-mono flex flex-col min-h-screen").child((
+    //     title().child("Advent Of Code 2024"),
+    //     main().child(div().class("text-white font-mono flex flex-row min-w-screen gap-8 p-8").child((nav_bar, Outlet()))),
+    // ))
 }

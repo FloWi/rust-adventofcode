@@ -1,3 +1,4 @@
 /target
 inputs/*
 /adventofcode-2024/inputs
+/adventofcode-2024/aoc-2024-wasm/node_modules
