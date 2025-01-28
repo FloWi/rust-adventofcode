@@ -107,16 +107,19 @@ done
                             )
                         }}
                     </p>
-                    <For
-                        // a function that returns the items we're iterating over; a signal is fine
-                        each=move || read.get().days
-                        // a unique key for each item
-                        key=|aoc_day| aoc_day.day
-                        // renders each item to a view
-                        children=move |aoc_day: AocDayInput| {
-                            view! { <p>{move || format!("day-{:02}", aoc_day.day)}</p> }
-                        }
-                    />
+                    {move || delete_files_button()}
+                    <ul>
+                        <For
+                            // a function that returns the items we're iterating over; a signal is fine
+                            each=move || read.get().days
+                            // a unique key for each item
+                            key=|aoc_day| aoc_day.day
+                            // renders each item to a view
+                            children=move |aoc_day: AocDayInput| {
+                                view! { <li>{move || format!("day-{:02}", aoc_day.day)}</li> }
+                            }
+                        />
+                    </ul>
                 </div>
 
                 <div
@@ -126,9 +129,6 @@ done
                 >
                     <div class="flex flex-wrap justify-center items-center">
                         {move || store_files_button()}
-                    </div>
-                    <div class="flex flex-wrap justify-center items-center">
-                        {move || delete_files_button()}
                     </div>
                     <div class="flex flex-col justify-center items-center">
                         <div>{move || is_over_drop_zone.get().then_some("Just let go...")}</div>

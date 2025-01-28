@@ -1,5 +1,5 @@
 use crate::app::{RunTaskData, Status, TaskStore};
-use crate::components::AocDayInput;
+use crate::components::{styled_button, AocDayInput};
 use aoc_2024_wasm::{Part, Solution};
 use chrono::{DateTime, Utc};
 use humantime::format_duration;
@@ -7,6 +7,7 @@ use itertools::Itertools;
 use leptos::logging::log;
 use leptos::prelude::*;
 use leptos::{component, IntoView};
+use leptos::ev::click;
 use leptos_router::components::A;
 
 #[component]
@@ -40,23 +41,23 @@ pub fn RunTasks(store: TaskStore) -> impl IntoView {
         (view! {
             <div class="p-4">
                 <h1 class="text-2xl font-bold mb-4">"Performance Test Of All Days"</h1>
-                <button
-                    class="bg-blue-500 text-white px-4 py-2 rounded disabled:bg-gray-400"
-                    disabled=move || {
-                        let status = store.status.get();
-                        match status {
-                            Status::Running { .. } => true,
-                            _ => false,
-                        }
-                    }
-                    on:click=move |_| {
-                        run_tasks.dispatch(());
-                    }
-                >
-                    "Run All Tasks"
-
-                </button>
-
+                {move || {
+                    styled_button()
+                        .disabled(move || {
+                            let status = store.status.get();
+                            match status {
+                                Status::Running { .. } => true,
+                                _ => false,
+                            }
+                        })
+                        .on(
+                            click,
+                            move |_| {
+                                run_tasks.dispatch(());
+                            },
+                        )
+                        .child("Run All Tasks")
+                }}
                 // Combined Tasks and Results view
                 <div class="mb-4">
                     <h2 class="text-xl mb-2">"Tasks:"</h2>
