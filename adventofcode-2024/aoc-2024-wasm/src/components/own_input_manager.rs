@@ -22,6 +22,16 @@ fn is_valid_file(file: &File) -> bool {
 
 #[component]
 pub fn OwnInputManager(local_storage_key: String) -> impl IntoView {
+    let download_instructions = r#"
+export AOC_SESSION="your_session_cookie"
+for i in {1..25}; do
+    wget "https://adventofcode.com/2024/day/$i/input" \
+         --header "Cookie: session=$AOC_SESSION" \
+         -O "day-$(printf "%02d" $i).txt"
+done
+                        "#
+    .trim();
+
     let (read, write, delete_fn) = use_local_storage::<AocInput, JsonSerdeCodec>(local_storage_key.clone());
 
     let (dropped, set_dropped) = signal(false);
@@ -74,18 +84,44 @@ pub fn OwnInputManager(local_storage_key: String) -> impl IntoView {
 
     view! {
         <div class="flex">
-            <div class="w-full h-auto relative">
+            <div class="w-auto h-auto relative flex flex-col gap-2">
                 <p>
-                    "Drop new files into dropZone. The files must be txt files and have the day as a filename (any \\d+ in there will do)."
-                </p>
-                <p>
-                    {format!(
-                        "The files will be stored in localstorage under the key '{local_storage_key}' and won't be uploaded. ",
-                    )}
+                    "Drop new files into dropZone below. The files must be txt files and have the day as a filename (any \\d+ in there will do)."
                 </p>
                 <p>"e.g. day-01.txt, day-02.txt"</p>
+                <p>
+                    "If you want to download all files for 2024, you can use this command. Before that you need to register at https://adventofcode.com/2024 and get the session cookie from one of the requests against the website."
+                </p>
+                <pre class="p-2 bg-secondary">{download_instructions}</pre>
+                <p>
+                    {format!(
+                        "The dropped files will be used locally (stored in localstorage under the key '{local_storage_key}') and won't be uploaded. ",
+                    )}
+                </p>
+                <div>
+                    <p>
+                        {move || {
+                            format!(
+                                "Currently stored {} file(s) in localstorage",
+                                read.get().days.len(),
+                            )
+                        }}
+                    </p>
+                    <For
+                        // a function that returns the items we're iterating over; a signal is fine
+                        each=move || read.get().days
+                        // a unique key for each item
+                        key=|aoc_day| aoc_day.day
+                        // renders each item to a view
+                        children=move |aoc_day: AocDayInput| {
+                            view! { <p>{move || format!("day-{:02}", aoc_day.day)}</p> }
+                        }
+                    />
+                </div>
+
                 <div
                     node_ref=drop_zone_el
+                    id="drop-zone"
                     class="flex flex-col w-full min-h-[200px] h-auto bg-gray-400/10 justify-center items-center pt-6"
                 >
                     <div class="flex flex-wrap justify-center items-center">
@@ -102,6 +138,7 @@ pub fn OwnInputManager(local_storage_key: String) -> impl IntoView {
                             <span>" file(s)"</span>
                         </p>
                     </div>
+
                     <div class="flex flex-wrap justify-center items-center gap-4">
                         {new_file_divs}
                     </div>
