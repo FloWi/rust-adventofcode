@@ -52,43 +52,40 @@ pub fn App() -> impl IntoView {
             // we wrap the whole app in a <Router/> to allow client-side navigation
             // from our nav links below
             <Router>
-                    // <Routes/> both defines our routes and shows them on the page
-                    <Routes fallback=|| "Not found.">
-                        <ParentRoute
-                            path=path!("adventofcode-2024")
-                            // this component has an <Outlet/> for rendering the inner <AocDay> component
-                            view=Main
-                        >
-                            <Route
-                                path=path!("manage-inputs")
-                                view=move || {
-                                    view! {
-                                        <OwnInputManager local_storage_key=local_storage_key
-                                            .clone() />
-                                    }
+                // <Routes/> both defines our routes and shows them on the page
+                <Routes fallback=|| "Not found.">
+                    <ParentRoute
+                        path=path!("adventofcode-2024")
+                        // this component has an <Outlet/> for rendering the inner <AocDay> component
+                        view=Main
+                    >
+                        <Route
+                            path=path!("manage-inputs")
+                            view=move || {
+                                view! {
+                                    <OwnInputManager local_storage_key=local_storage_key.clone() />
                                 }
-                            />
-                            <Route
-                                path=path!("all-days-performance")
-                                view=move || {
-                                    view! {
-                                        <RunAllComponent aoc_input_files=all_real_input_files />
-                                    }
-                                }
-                            />
-                            <Route
-                                path=path!("day/:day")
-                                view=move || {
-                                    view! { <AocDay aoc_input_files=all_real_input_files /> }
-                                }
-                            />
-                            // a fallback if the /:id segment is missing from the URL
-                            <Route
-                                path=path!("")
-                                view=move || view! { <p class="day">"Select a day."</p> }
-                            />
-                        </ParentRoute>
-                    </Routes>
+                            }
+                        />
+                        <Route
+                            path=path!("all-days-performance")
+                            view=move || {
+                                view! { <RunAllComponent aoc_input_files=all_real_input_files /> }
+                            }
+                        />
+                        <Route
+                            path=path!("day/:day")
+                            view=move || {
+                                view! { <AocDay aoc_input_files=all_real_input_files /> }
+                            }
+                        />
+                        // a fallback if the /:id segment is missing from the URL
+                        <Route
+                            path=path!("")
+                            view=move || view! { <p class="day">"Select a day."</p> }
+                        />
+                    </ParentRoute>
+                </Routes>
             </Router>
         </div>
     }
@@ -444,16 +441,15 @@ fn Main() -> impl IntoView {
 
     view! {
         <div class="desktop-page bg-background shadow-md p-4">
-                <title>"Advent Of Code 2024"</title>
-                <div class="header"><h1>"Advent Of Code 2024"</h1></div>
-                <div class="sub-header"></div>
-                <div class="left">
-                    {days_html}
-                    {other_links_html}
-                </div>
-                <div class="content">
-                    <Outlet />
-                </div>
+            <title>"Advent Of Code 2024"</title>
+            <div class="header">
+                <h1>"Advent Of Code 2024"</h1>
+            </div>
+            <div class="sub-header"></div>
+            <div class="left">{days_html} {other_links_html}</div>
+            <div class="content">
+                <Outlet />
+            </div>
         </div>
     }
 

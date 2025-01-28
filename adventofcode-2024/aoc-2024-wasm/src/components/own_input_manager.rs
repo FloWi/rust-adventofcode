@@ -16,6 +16,10 @@ use send_wrapper::SendWrapper;
 use std::ops::Not;
 use web_sys::File;
 
+fn is_valid_file(file: &File) -> bool {
+    parse_day_from_str(&file.name()).is_some()
+}
+
 #[component]
 pub fn OwnInputManager(local_storage_key: String) -> impl IntoView {
     let (read, write, delete_fn) = use_local_storage::<AocInput, JsonSerdeCodec>(local_storage_key.clone());
@@ -24,13 +28,16 @@ pub fn OwnInputManager(local_storage_key: String) -> impl IntoView {
 
     let drop_zone_el = NodeRef::<Div>::new();
 
-    let UseDropZoneReturn { is_over_drop_zone, files } = use_drop_zone_with_options(
+    let UseDropZoneReturn {
+        is_over_drop_zone,
+        files: dropped_files,
+    } = use_drop_zone_with_options(
         drop_zone_el,
         UseDropZoneOptions::default().on_drop(move |_| set_dropped.set(true)).on_enter(move |_| set_dropped.set(false)),
     );
 
-    let file_divs = move || {
-        files
+    let new_file_divs = move || {
+        dropped_files
             .get()
             .iter()
             .map(|file| {
@@ -48,10 +55,6 @@ pub fn OwnInputManager(local_storage_key: String) -> impl IntoView {
                             <span>"Type:"</span>
                             <span>{file.type_()}</span>
                         </p>
-                        <p>
-                            <span>"Last modified:"</span>
-                            <span>{file.last_modified()}</span>
-                        </p>
                     </div>
                 }
             })
@@ -59,21 +62,21 @@ pub fn OwnInputManager(local_storage_key: String) -> impl IntoView {
     };
 
     let store_files_button = move || {
-        files.get().is_empty().not().then_some(
-            styled_button().child("Store files in localstorage").on(ev::click, move |_| spawn_local(store_files_in_localstorage(files.get(), write))),
+        dropped_files.get().is_empty().not().then_some(
+            styled_button().child("Store files in localstorage").on(ev::click, move |_| spawn_local(store_files_in_localstorage(dropped_files.get(), write))),
         )
     };
 
     let delete_files_button = move || {
         let delete_fn_cloned = delete_fn.clone();
-        files.get().is_empty().then_some(styled_button().child("Delete files from localstorage").on(ev::click, move |_| delete_fn_cloned()))
+        read.get().days.is_empty().not().then_some(styled_button().child("Delete files from localstorage").on(ev::click, move |_| delete_fn_cloned()))
     };
 
     view! {
         <div class="flex">
             <div class="w-full h-auto relative">
                 <p>
-                    "Drop files into dropZone. The files must be txt files and have the day as a filename (any \\d+ in there will do)."
+                    "Drop new files into dropZone. The files must be txt files and have the day as a filename (any \\d+ in there will do)."
                 </p>
                 <p>
                     {format!(
@@ -81,31 +84,27 @@ pub fn OwnInputManager(local_storage_key: String) -> impl IntoView {
                     )}
                 </p>
                 <p>"e.g. day-01.txt, day-02.txt"</p>
-                <div class="bg-green w-16 h16"></div>
                 <div
                     node_ref=drop_zone_el
                     class="flex flex-col w-full min-h-[200px] h-auto bg-gray-400/10 justify-center items-center pt-6"
                 >
-                    <div>is_over_drop_zone: <BooleanDisplay value=is_over_drop_zone /></div>
-                    <div>dropped: <BooleanDisplay value=dropped /></div>
                     <div class="flex flex-wrap justify-center items-center">
+                        {move || store_files_button()}
+                    </div>
+                    <div class="flex flex-wrap justify-center items-center">
+                        {move || delete_files_button()}
+                    </div>
+                    <div class="flex flex-col justify-center items-center">
+                        <div>{move || is_over_drop_zone.get().then_some("Just let go...")}</div>
                         <p>
-                            <span>"Got "</span>
-                            {move || files.get().len()}
-                            <span>" files"</span>
+                            <span>"Dropped "</span>
+                            {move || dropped_files.get().len()}
+                            <span>" file(s)"</span>
                         </p>
                     </div>
-                    <div class="flex flex-wrap justify-center items-center gap-4">{file_divs}</div>
-                    <div class="flex flex-wrap justify-center items-center">
-                        {move || store_files_button() }
+                    <div class="flex flex-wrap justify-center items-center gap-4">
+                        {new_file_divs}
                     </div>
-                    <div class="flex flex-wrap justify-center items-center">
-                        {move ||
-                            delete_files_button()
-                        }
-
-                    </div>
-
                 </div>
             </div>
         </div>
