@@ -4,10 +4,10 @@ use aoc_2024_wasm::{Part, Solution};
 use chrono::{DateTime, Utc};
 use humantime::format_duration;
 use itertools::Itertools;
+use leptos::ev::click;
 use leptos::logging::log;
 use leptos::prelude::*;
 use leptos::{component, IntoView};
-use leptos::ev::click;
 use leptos_router::components::A;
 
 #[component]

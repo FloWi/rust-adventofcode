@@ -94,15 +94,12 @@ pub fn App() -> impl IntoView {
 async fn write_to_clipboard(text: String) {
     let maybe_clipboard = web_sys::window().map(|w| w.navigator().clipboard());
     match maybe_clipboard {
-        Some(cp) => {
-            match JsFuture::from(cp.write_text(text.as_str())).await.map_err(|err| format!("Error writing to clipboard: {:?}", err)) {
-                Ok(_) => {}
-                Err(_) => {
-                    error!("Can't write to clipboard")
-                }
+        Some(cp) => match JsFuture::from(cp.write_text(text.as_str())).await.map_err(|err| format!("Error writing to clipboard: {:?}", err)) {
+            Ok(_) => {}
+            Err(_) => {
+                error!("Can't write to clipboard")
             }
-            
-        }
+        },
         None => error!("Can't write to clipboard"),
     }
 }
@@ -121,8 +118,8 @@ fn AocTestcase(testcase: Testcase) -> impl IntoView {
     };
 
     let result_html = match result.clone() {
-        Ok(res) => span().class("font-bold").child(res.result),
-        Err(err) => span().class("font-bold red").child(format!("Error: {}", err)),
+        Ok(res) => span().class("font-bold font-mono whitespace-pre bg-secondary").child(res.result),
+        Err(err) => span().class("font-bold font-mono whitespace-pre bg-secondary red").child(format!("Error: {}", err)),
     };
 
     let testcase_input = testcase.input.clone();
@@ -135,21 +132,22 @@ fn AocTestcase(testcase: Testcase) -> impl IntoView {
         Err(_) => "-".to_string(),
     };
 
-    div().child((
+    div().class("flex flex-col gap-2").child((
         //view! { <textarea readonly class="">{testcase.input}</textarea>  },
-        p().child(span().class("font-bold").child("Expected Solution: ")).child(span().child(testcase.solution)),
+        p().child(span().class("font-bold").child("Expected Solution: "))
+            .child(span().child(span().class("font-bold font-mono whitespace-pre bg-secondary").child(testcase.solution))),
         p().child(span().class("font-bold").child("Actual Solution: ")).child(result_html),
         p().child(span().class("font-bold").child("Duration: ")).child(duration),
         //testcase.args.map(|args| p().child(span().class("font-bold").child("Custom Args: ")).child(args)),
         testcase.args.map(|arg| p().child(span().class("font-bold").child("Custom Args: ")).child(span().child(arg))),
         p().class("font-bold mt-4").child(span().child("Testdata:")),
-        styled_button().on(leptos::ev::click, move |_| spawn_local(write_to_clipboard(testcase_input.clone()))).child("Copy"),
         textarea()
             .readonly(true)
-            .class("w-full overflow-y-auto overflow-x-auto whitespace-pre text-inherit bg-inherit")
+            .class("overflow-y-auto overflow-x-auto whitespace-pre font-mono whitespace-pre bg-secondary h-36")
             .child(testcase.input)
             .rows(20)
             .cols(40),
+        styled_button().on(leptos::ev::click, move |_| spawn_local(write_to_clipboard(testcase_input.clone()))).child("Copy"),
     ))
 }
 
@@ -191,7 +189,7 @@ fn AocDay(aoc_input_files: Signal<AocInput>) -> impl IntoView {
                     .map(|(part, testcases)| {
                         div()
                             .class("flex flex-col gap-4 divide-y")
-                            .child(h3().child(format!("Part {}: {} Testcases", part, testcases.len())))
+                            .child(h3().class("text-2xl font-bold").child(format!("Part {}: {} Testcase(s)", part, testcases.len())))
                             .child(testcases.into_iter().map(|tc| AocTestcase(AocTestcaseProps { testcase: tc.clone() })).collect_view())
                     })
                     .collect_view()
@@ -209,27 +207,32 @@ fn AocDay(aoc_input_files: Signal<AocInput>) -> impl IntoView {
                         log!("calculated result for real input for day {day} part {part:?}. Result: {result:?}");
                         div()
                             .child(h3().child(format!("Real input {part:?}")))
-                            .child([
-                                p().child(span().class("font-bold").child("Actual Solution: ")).child(result.result),
+                            .child((
+                                p().child(span().child("Actual Solution: "))
+                                    .child(span().class("font-bold font-mono whitespace-pre bg-secondary").child(result.result)),
                                 p().child(span().class("font-bold").child("Duration: ")).child(duration_pretty),
-                            ])
+                            ))
                             .into_any()
                     })
                     .collect_view()
             });
 
             div()
-                .child(h2().class("text-xl font-bold").child(format!("AocDay - Day {:02}", day_str)))
+                .child(h2().class("text-3xl font-bold").child(format!("AocDay - Day {:02}", day_str)))
                 .child(div().class("flex flex-row gap-8 divide-x").child(part_divs).child(real_input_divs))
                 .child(
-                    div().class("flex flex-col gap-4").child(h3().child("real input")).child(div().class("flex flex-row gap-4")).child(
-                        textarea()
-                            .readonly(true)
-                            .class("w-full overflow-y-auto overflow-x-auto whitespace-pre text-inherit bg-inherit")
-                            .child(maybe_real_input.map(|real| real.input))
-                            .rows(40)
-                            .cols(40),
-                    ),
+                    div()
+                        .class("mt-6 flex flex-col gap-4")
+                        .child(h3().class("text-2xl font-bold").child("real input"))
+                        .child(div().class("flex flex-row gap-4"))
+                        .child(
+                            textarea()
+                                .readonly(true)
+                                .class("w-fit h-fit overflow-y-auto overflow-x-auto font-mono whitespace-pre bg-secondary")
+                                .child(maybe_real_input.map(|real| real.input))
+                                .rows(20)
+                                .cols(40),
+                        ),
                 )
         })
     }
